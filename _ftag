@@ -33,6 +33,7 @@ arguments=(
     {-t,--toilet}'[Color and format header with toilet]'
     {-l,--local}'[Use tags in local directory]:local:->local_tags'
     {-z,--zoxide}'[Start zoxide to select directory to use tags]'
+    {-j,--jump}'[Start zoxide to select directory to use tags]'
   )
 
 _arguments "${_arguments_options[@]}" $arguments \
