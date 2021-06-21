@@ -51,7 +51,7 @@ function Ftag::dep() {
   fi
 }
 function Ftag::opts() { (( ${+opts[-${${(@s. .)@}[1]}]} || ${+opts[--${${(@s. .)@}[2]}]} )); }
-function Ftag::is_git() { command git -C "${(z)@}" rev-parse --is-inside-work-tree >/dev/null; }
+function Ftag::is_git() { command git -C "${(z)@}" rev-parse --is-inside-work-tree; }
 
 # TODO: use this or no?
 function Ftag::declare() {
@@ -84,22 +84,22 @@ function Ftag::cleanup() {
 
 # == Functions: Actions == [[[
 function Ftag::zoxide() {
-  _ZO_FZF_OPTS="$FZF_DEFAULT_OPTS --prompt ' Zoxide Tag> '" zoxide query -i
+  _ZO_FZF_OPTS="$FZF_DEFAULT_OPTS --prompt ' Zoxide Tag> '" zoxide query -i
 }
 
 function Ftag::autojump() {
-  autojump -s | tac | awk 'NR>7{print $2}' | fzf --prompt ' Jump Tag> '
+  autojump -s | tac | awk 'NR>7{print $2}' | fzf --prompt ' Jump Tag> '
 }
 
 # TODO: create a prompt to switch paths
 function Ftag::path::find() {
-  tag -tf '*' $FZFTAG_PATH | fzf --prompt ' Path> '
+  tag -tf '*' $FZFTAG_PATH | fzf --prompt ' Path> '
   # builtin cd -q "$FZFTAG_PATH" && \
-    # tag -el $FZFTAG_PATH | fzf --prompt ' Path> '
+    # tag -el $FZFTAG_PATH | fzf --prompt ' Path> '
 }
 
 function Ftag::gitui() {
-  # gitui -d "${(z)@}" - Freezes
+  # gitui -d "${(z)@}" - Freezes -- could add grv
   if Ftag::dep "lazygit"; then lazygit -p "${(z)@}"
   elif Ftag::dep "tig"; then tig -C "${(z)@}"
   fi
@@ -139,10 +139,10 @@ function Ftag::toilet() {
   }
 }
 
-# TODO: add this as action
-function RG() {
+function Ftag::RG() {
+   # TODO: add options to fzf
   local RG_PREFIX INITIAL_QUERY
-  local -a selected
+  local -a selected opts
   RG_PREFIX="rg --column --hidden --line-number --no-heading --color=always --smart-case "
   INITIAL_QUERY="${*:-}"
   selected=("$(
@@ -155,8 +155,8 @@ function RG() {
         --preview 'bat --style=numbers,header,changes,snip --color=always --highlight-line {2} {1}' \
         --preview-window 'default:right:60%:~1:+{2}+3/2:border-left'
   )")
-  selected=(${(@s.:.)selected})
-  [ -n "${selected[1]}" ] && ${EDITOR} "${selected[1]}" "+${selected[2]}"
+  selected=( ${(@s.:.)selected} )
+  [[ -n "${selected[1]}" ]] && ${EDITOR} "${selected[1]}" "+${selected[2]}"
 }
 
 function Ftag::gpg() {
@@ -205,6 +205,82 @@ function Ftag::twf() {
     twf -dir "${(z)@}" -previewCmd "${prev} {}"
   fi
 }
+
+function Ftag::dua() {
+  if Ftag::dep "dua"; then
+    dua i "$@"
+  elif Ftag::dep "ncdu"; then
+    ncdu "$@"
+  else
+    return 1
+  fi
+}
+
+# TODO: figure out how to source & add this for everyone
+function Ftag::forgit() {
+  local -A forgit_cmds
+  forgit_cmds[add]="forgit::add"
+  forgit_cmds[log]="forgit::log"
+  forgit_cmds[diff]="forgit::diff"
+  forgit_cmds[ignore]="forgit::ignore"
+  forgit_cmds[reset_HEAD_file]="forgit::reset::head"
+  forgit_cmds[checkout_file]="forgit::checkout::file"
+  forgit_cmds[checkout_branch]="forgit::checkout::branch"
+  forgit_cmds[checkout_commit]="forgit::checkout::commit"
+  forgit_cmds[clean]="forgit::clean"
+  forgit_cmds[stash]="forgit::stash::show"
+  forgit_cmds[cherry-pick]="forgit::cherry::pick"
+  forgit_cmds[rebase_i]="forgit::rebase"
+  forgit_cmds[fixup]="forgit::fixup"
+  local reply wfxr
+  wfxr=${(@f)$(whence -va forgit::log)}
+  [[ -f "$wfxr" ]] && builtin source "$wfxr"
+
+  if [[ -n "$ZINIT" ]]; then
+    if [[ -f "${ZINIT[PLUGINS_DIR]}/wfxr---forgit/forgit.plugin.zsh" ]]; then
+      builtin source "${ZINIT[PLUGINS_DIR]}/wfxr---forgit/forgit.plugin.zsh"
+    elif [[ -f "${ZINIT[HOME_DIR]}/plugins/wfxr---forgit/forgit.plugin.zsh" ]]; then
+      builtin source "${ZINIT[HOME_DIR]}/plugins/wfxr---forgit/forgit.plugin.zsh"
+    fi
+  elif [[ -n "$ZDOTDIR" ]]; then
+    # ??
+    if [[ -f "${ZDOTDIR}/ohmyzsh/custom/plugins/wfxr-forgit/forgit.plugin.zsh" ]]; then
+      builtin source "${ZDOTDIR}/ohmyzsh/custom/plugins/wfxr-forgit/forgit.plugin.zsh"
+    fi
+  fi
+
+  reply=$(print -rl "${(@k)forgit_cmds}" | fzf)
+  [[ -n "$reply" ]] && eval "${functions[$forgit_cmds[$reply]]}"
+}
+
+function Ftag::dotbare() {
+  # If dir is git use dotbare in that dir; else use on dotfiles
+  # Brings up own interactive menu
+  local -a choice action
+  Ftag::dep "dotbare" || return 1
+  if [[ $(Ftag::is_git "$@") ]]; then
+    setopt localoptions noautopushd
+    builtin cd -q "$@"
+    choice=( ${(@f)"$(dotbare)"} )
+    action=( ${(@z)choice[1]} )
+    final=${action[$(( ${action[(I)dotbare]} + 1 ))]}
+    dotbare --git "$final"
+  else
+    choice=( ${(@f)"$(dotbare)"} )
+    action=( ${(@z)choice[1]} )
+    final=${action[$(( ${action[(I)dotbare]} + 1 ))]}
+    dotbare "$final"
+  fi
+}
+
+# FIXME: get to work
+functions Ftag::glow() {
+  integer mdfiles
+  builtin cd -q "$@"
+  terminal-notifier -title "here1" -message "x"
+  mdfiles=$(command ls *.md | wc -l)
+  (( lsfiles > 0 )) && glow
+}
 # ]]]
 
 # == Functions: Formatting and Display == [[[
@@ -249,9 +325,10 @@ function Ftag::usage() {
   Ftag::default_header -s "ftag" -c 13
   print -P -- "%F{12}%BUSAGE:%b%f"
   print -P -- "\t%F{14}ftag%f %F{13} [wsh]%f %F{2}<tag>%f"
-  print -P -- "\t%F{2}ftag%f is an fzf TUI type for %F{2}tags%f on macOS"
+  print -P -- "\t%F{2}ftag%f is an FZF TUI for jdberry's %F{2}tag%f on macOS"
   print -P -- "\tIt uses 'figlet' by default to display headers, though it is not needed"
-  print -P -- "\t%F{2}<tag>%f is optional (has to be an exact match)"
+  print -P -- "\t%F{2}<tag>%f is optional argument, and if used, it must be exact. There"
+  print -P -- "\tare zsh completions to complete tags. For a fuzzy search, use the %F{2}-q%f flag"
   print -P -- "%F{12}%BFLAGS:%b%f"
   print -P -- "\t%F{2}-w%f,%F{2}--wutag%f\t\tAlso tag files with %F{3}wutag%f (%F{2}-ww%f only uses wutag)"
   print -P -- "\t%F{2}-q%f,%F{2}--query <query>%f\tStart fzf with a query"
@@ -279,6 +356,7 @@ function Ftag::show_keys() {
   print -P -- "\t%F{2}U%f\tShow tag usage\t%F{14}ACTION_USAGE%f"
   print -P -- "\t%F{2}E%f\tEdit selected tags with \$EDITOR\t%F{14}ACTION_EDIT%f"
   print -P -- "\t%F{2}F%f\tOpen directory with file manager in which tagged file resides\t%F{14}ACTION_FILEMANAGER%f"
+  print -P -- "\t%F{2}Ctrl-w%f\tOpen directory with %F{3}glow%f if dir contains markdown files\t%F{14}ACTION_GLOW%f"
   print -P -- "\t%F{2}I%f\tOpen %F{3}gitui%f/%F{3}lazygit%f if directory is a git-dir\t%F{14}ACTION_GIT%f"
   print -P -- "\t%F{2}L%f\tSwitch to local mode (i.e., current directory)\t%F{14}ACTION_LOCAL%f"
   print -P -- "\t%F{2}G%f\tSwitch to global mode (i.e., default mode/all tags on file system)\t%F{14}ACTION_GLOBAL%f"
@@ -288,9 +366,15 @@ function Ftag::show_keys() {
   print -P -- "\t%F{2}Ctrl-g%f\tEncrypt or decrypt a file with %F{3}gpg%f. If encrypted, decrypt and vice versa\t%F{14}ACTION_GPG%f"
   print -P -- "\t%F{2}Ctrl-d%f\tOpen directory in %F{3}dua%f interactive mode\t%F{14}ACTION_DUA%f"
   print -P -- "\t%F{2}Ctrl-t%f\tOpen directory in %F{3}twf%f to edit file\t%F{14}ACTION_TWF_EDIT%f"
-  print -P -- "\t%F{2}P%f\tToggle preview of file or directory)\t%F{14}ACTION_PREVIEW%f"
-  print -P -- "\t%F{2}Ctrl-y%f\tCopy the file or directory)\t%F{14}ACTION_COPY%f"
+  print -P -- "\t%F{2}Ctrl-r%f\tOpen directory in %F{3}rg%f interactive search\t%F{14}ACTION_RIPGREP%f"
+
+  print -P -- "\t%F{2}Ctrl-f%f\tIf git-dir, open %F{3}forgit%f to select action\t%F{14}ACTION_FORGIT%f"
+  print -P -- "\t%F{2}Ctrl-b%f\tIf git-dir, open %F{3}dotbare%f to select action\t%F{14}ACTION_DOTBARE%f"
+  print -P -- "\t%F{2}Ctrl-n%f\tOpen directory in finder\t%F{14}ACTION_FINDER%f"
+
+  print -P -- "\t%F{2}P%f\tToggle preview of file or directory\t%F{14}ACTION_PREVIEW%f"
   print -P -- "\t%F{2}V%f\tToggle %F{3}bat%f to view file (requires %F{3}bat%f)\t%F{14}ACTION_VIEW%f"
+  print -P -- "\t%F{2}Ctrl-y%f\tCopy the file or directory\t%F{14}ACTION_COPY%f"
   print -P -- "\t%F{2}?%f\tShow keys\t%F{14}ACTION_HELP%f"
   Ftag::env_vars
 }
@@ -354,16 +438,22 @@ readonly ACTION_GPG_EDIT="execute(env FZFTAG_ACTION=gpg-edit $prog {+f} ${(z)TTY
 readonly ACTION_GPG="execute(env FZFTAG_ACTION=gpg $prog {+f} ${(z)TTY_REDIRECTION})${(z)FTAG_PRINT}"
 readonly ACTION_DUA="execute(env FZFTAG_ACTION=dua $prog {+f} ${(z)TTY_REDIRECTION})${(z)FTAG_PRINT}"
 readonly ACTION_TWF_EDIT="execute(env FZFTAG_ACTION=twf-edit $prog {+f} ${(z)TTY_REDIRECTION})${(z)FTAG_PRINT}"
-readonly ACTION_LOCAL="execute(env FZFTAG_STATE_CHANGE=local $prog )${(z)FTAG_RELOAD}${FTAG_CHPROMPT}(Local Tag>)"
-readonly ACTION_GLOBAL="execute(env FZFTAG_STATE_CHANGE=global $prog )${(z)FTAG_RELOAD}${FTAG_CHPROMPT}(Global Tag>)"
-readonly ACTION_ZOXIDE="execute(env FZFTAG_STATE_CHANGE=zoxide $prog )${(z)FTAG_RELOAD}${FTAG_CHPROMPT}(Zoxide Tag>)"
-readonly ACTION_AUTOJUMP="execute(env FZFTAG_STATE_CHANGE=autojump $prog )${(z)FTAG_RELOAD}${FTAG_CHPROMPT}(Jump Tag>)"
+readonly ACTION_RIPGREP="execute(env FZFTAG_ACTION=ripgrep $prog {+f} ${(z)TTY_REDIRECTION})${(z)FTAG_PRINT}"
+readonly ACTION_FORGIT="execute(env FZFTAG_ACTION=forgit $prog {+f} ${(z)TTY_REDIRECTION})${(z)FTAG_PRINT}"
+readonly ACTION_DOTBARE="execute(env FZFTAG_ACTION=dotbare $prog {+f} ${(z)TTY_REDIRECTION})${(z)FTAG_PRINT}"
+readonly ACTION_FINDER="execute(env FZFTAG_ACTION=open-finder $prog {+f} ${(z)TTY_REDIRECTION})${(z)FTAG_PRINT}"
+readonly ACTION_GLOW="execute(env FZFTAG_ACTION=glow $prog {+f} ${(z)TTY_REDIRECTION})${(z)FTAG_PRINT}"
+readonly ACTION_LOCAL="execute(env FZFTAG_STATE_CHANGE=local $prog )${(z)FTAG_RELOAD}${FTAG_CHPROMPT}( Local Tag> )"
+readonly ACTION_GLOBAL="execute(env FZFTAG_STATE_CHANGE=global $prog )${(z)FTAG_RELOAD}${FTAG_CHPROMPT}( Global Tag> )"
+readonly ACTION_ZOXIDE="execute(env FZFTAG_STATE_CHANGE=zoxide $prog )${(z)FTAG_RELOAD}${FTAG_CHPROMPT}( Zoxide Tag> )"
+readonly ACTION_AUTOJUMP="execute(env FZFTAG_STATE_CHANGE=autojump $prog )${(z)FTAG_RELOAD}${FTAG_CHPROMPT}( Jump Tag> )"
 readonly ACTION_COPY="execute-silent(echo {1} | ${(z)ftag_copy} )"
 readonly ACTION_VIEW="execute(bat --style=header,snip -f --paging=always {1} )"
 readonly ACTION_RELOAD="reload(env _FZFTAG_INTERNAL=reload $prog)"
 readonly ACTION_PREVIEW="toggle-preview"
 readonly ACTION_HELP="execute(env _FZFTAG_SHOW=keys $prog | ${(z)ftag_pager} )${(z)FTAG_PRINT}"
 
+# TODO: use or remove
 readonly ACTION_TWF_SWITCH="execute(env FZFTAG_STATE_CHANGE=twf-switch $prog )${(z)FTAG_RELOAD}${FTAG_CHPROMPT}(TWF Tag>)"
 
 # TODO: create page explaining fzf executes to allow these
@@ -376,10 +466,14 @@ typeset -gA FZFTAG_KEYBINDINGS
 : ${FZFTAG_KEYBINDINGS[T]:=$ACTION_TEST}
 : ${FZFTAG_KEYBINDINGS[F]:=$ACTION_FILEMANAGER}
 : ${FZFTAG_KEYBINDINGS[I]:=$ACTION_GIT}
+: ${FZFTAG_KEYBINDINGS[${ftag_modifier}-b]:=$ACTION_DOTBARE}
 : ${FZFTAG_KEYBINDINGS[${ftag_modifier}-e]:=$ACTION_GPG_EDIT}
 : ${FZFTAG_KEYBINDINGS[${ftag_modifier}-g]:=$ACTION_GPG}
 : ${FZFTAG_KEYBINDINGS[${ftag_modifier}-d]:=$ACTION_DUA}
 : ${FZFTAG_KEYBINDINGS[${ftag_modifier}-t]:=$ACTION_TWF_EDIT}
+: ${FZFTAG_KEYBINDINGS[${ftag_modifier}-r]:=$ACTION_RIPGREP}
+: ${FZFTAG_KEYBINDINGS[${ftag_modifier}-n]:=$ACTION_FINDER}
+: ${FZFTAG_KEYBINDINGS[${ftag_modifier}-w]:=$ACTION_GLOW}
 : ${FZFTAG_KEYBINDINGS[L]:=$ACTION_LOCAL}
 : ${FZFTAG_KEYBINDINGS[G]:=$ACTION_GLOBAL}
 : ${FZFTAG_KEYBINDINGS[Z]:=$ACTION_ZOXIDE}
@@ -390,6 +484,7 @@ typeset -gA FZFTAG_KEYBINDINGS
 : ${FZFTAG_KEYBINDINGS[P]:=$ACTION_PREVIEW}
 : ${FZFTAG_KEYBINDINGS[?]:=$ACTION_HELP}
 
+: ${FZFTAG_KEYBINDINGS[${ftag_modifier}-f]:=$ACTION_FORGIT}
 : ${FZFTAG_KEYBINDINGS[${ftag_modifier}-s]:=$ACTION_TWF_SWITCH}
 
 typeset -a FZFTAG_ACTIONS
@@ -421,10 +516,13 @@ if [[ "${_FZFTAG_SHOW}" = "keys" ]]; then
   exit 0
 fi
 
-# TODO: actions: delete file
 # FIXME: try and use this instead of awk
 # declare -a input; input=($@)
 # print -l "${input[@]/(#b)([^\/]##\/)##([^\/]##)*/${match[3]}}"
+
+# TODO: actions: delete file
+# TODO: Add another case statement for opening files
+# TODO: Add mdcat/mdv/glow/etc
 if [[ -n "$FZFTAG_ACTION" ]]; then
   clear
   # Get the filename
@@ -442,7 +540,7 @@ if [[ -n "$FZFTAG_ACTION" ]]; then
       vared -cp "Set tags for ${tag_args:t3}: " tag
       for file in "${(f)tag_args[@]}"; do
         # Wutag only works if variables are set first
-        fname="${file:t}"; fdir="${file:h}"
+        fname="${file:t}" fdir="${file:h}"
         # Wutag is called in addition unless -ww
         if (( FZFTAG_WTAG > 1 )) {
           Ftag::wutag -s "$fdir" "$fname" "$tag"
@@ -459,7 +557,7 @@ if [[ -n "$FZFTAG_ACTION" ]]; then
       Ftag::parse_format "add tags"
       vared -cp "Add tags for ${tag_args:t3}: " tag
       for file in "${(f)tag_args[@]}"; do
-        fname="${file:t}"; fdir="${file:h}"
+        fname="${file:t}" fdir="${file:h}"
         if (( FZFTAG_WTAG > 1 )) {
           Ftag::wutag -a "$fdir" "$fname" "$tag"
         } elif (( FZFTAG_WTAG == 1 )) {
@@ -475,7 +573,7 @@ if [[ -n "$FZFTAG_ACTION" ]]; then
       Ftag::parse_format "remove tags"
       vared -cp "Remove tags for ${tag_args:t3}: " tag
       for file in "${(f)tag_args[@]}"; do
-        fname="${file:t}"; fdir="${file:h}"
+        fname="${file:t}" fdir="${file:h}"
         if (( FZFTAG_WTAG > 1 )) {
           Ftag::wutag -r "$fdir" "$fname"
         } elif (( FZFTAG_WTAG == 1 )) {
@@ -485,6 +583,19 @@ if [[ -n "$FZFTAG_ACTION" ]]; then
           tag --remove "${tag}" "$file"
         }
       done
+      ;;
+    ripgrep)
+      local fname fdir yesno keyw
+      Ftag::parse_format "ripgrep search"
+      vared -cp "Local [Y/n]: " yesno
+      vared -cp "Ripgrep keyword: " keyw
+      [[ "$yesno" == (#i)n ]] && {
+        () {
+            setopt localoptions noautopushd
+            builtin cd -q "${tag_args:h}"
+            Ftag::RG "$keyw"
+          };
+        } || Ftag::RG "$keyw"
       ;;
     usage)
       tag --usage | ${(z)lpager}
@@ -496,8 +607,19 @@ if [[ -n "$FZFTAG_ACTION" ]]; then
       $ftag_fmanager "${tag_args:h}"
       ;;
     git)
-      Ftag::is_git "${tag_args:h}" || return 1
+      Ftag::is_git "${tag_args:h}" >/dev/null || return 1
       Ftag::gitui "${tag_args:h}"
+      ;;
+    forgit)
+      Ftag::is_git "${tag_args:h}" >/dev/null || return 1
+      Ftag::forgit
+      ;;
+    dotbare)
+      Ftag::dotbare "${tag_args:h}"
+      # dotbare --git "${tag_args:h}"
+      # Ftag::is_git "${tag_args:h}" || return 1
+      # cd -q "${tag_args:h}" && dotbare --git
+      # dotbare flog | bat
       ;;
     gpg-edit)
       Ftag::gpg -e "$tag_args"
@@ -506,13 +628,17 @@ if [[ -n "$FZFTAG_ACTION" ]]; then
       Ftag::gpg "$tag_args"
       ;;
     dua)
-      Ftag::dep "dua" && dua i "${tag_args:h}"
+      Ftag::dua "${tag_args:h}"
       ;;
     twf-edit)
       Ftag::dep "twf" && Ftag::twf -e "${tag_args:h}"
       ;;
-    # TODO: Add another case statement for opening files
-    # TODO: Open current path to tag files
+    open-finder)
+      open "${tag_args:h}" && exit 0
+      ;;
+    glow)
+      Ftag::glow "${tag_args:h}"
+      ;;
   esac
   clear
   print -Pr -- "%F{1}${(l:COLUMNS::=:):-}%f"
@@ -626,13 +752,13 @@ while (( $? != 130 )); do
   # Set initial prompt
   local -a FZFTAG_OPTS
   if Ftag::opts "l local" || [[ "$FZFTAG_STATE_CHANGE" == "local" ]]; then
-    FZFTAG_OPTS=( "--prompt ' Local Tag> '" )
+    FZFTAG_OPTS=( "--prompt ' Local Tag> '" )
   elif Ftag::opts "p path" || [[ "$FZFTAG_STATE_CHANGE" == "path" ]]; then
-    FZFTAG_OPTS=( "--prompt ' Path> '" )
+    FZFTAG_OPTS=( "--prompt ' Path> '" )
   elif Ftag::opts "z zoxide" || [[ "$FZFTAG_STATE_CHANGE" == "zoxide" ]]; then
-    FZFTAG_OPTS=( "--prompt ' Zoxide Tag> '" )
+    FZFTAG_OPTS=( "--prompt ' Zoxide Tag> '" )
   elif Ftag::opts "j jump" || [[ "$FZFTAG_STATE_CHANGE" == "autojump" ]]; then
-    FZFTAG_OPTS=( "--prompt ' Jump Tag> '" )
+    FZFTAG_OPTS=( "--prompt ' Jump Tag> '" )
   else
     # FZFTAG_OPTS=( "--prompt 'Tag> '" "--delimiter /" "--with-nth 4.." )
     FZFTAG_OPTS=( "--prompt 'Tag> '" )
