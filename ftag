@@ -20,6 +20,7 @@ prog_dir="${0:A:h}"
 
 # TODO: add support for skim
 # TODO: does query need to be =query?
+# TODO: add support for file paths with spaces
 # Set query as optional args to prevent errors
 local -A opts
 zparseopts -D -A opts h -help s -skim b -boxes c -lolcat t -toilet -\
@@ -375,6 +376,7 @@ function Ftag::show_keys() {
   print -P -- "\t%F{2}P%f\tToggle preview of file or directory\t%F{14}ACTION_PREVIEW%f"
   print -P -- "\t%F{2}V%f\tToggle %F{3}bat%f to view file (requires %F{3}bat%f)\t%F{14}ACTION_VIEW%f"
   print -P -- "\t%F{2}Ctrl-y%f\tCopy the file or directory\t%F{14}ACTION_COPY%f"
+  print -P -- "\t%F{2}Q%f\tQuit fzf\t%F{14}ACTION_QUIT%f"
   print -P -- "\t%F{2}?%f\tShow keys\t%F{14}ACTION_HELP%f"
   Ftag::env_vars
 }
@@ -452,6 +454,7 @@ readonly ACTION_VIEW="execute(bat --style=header,snip -f --paging=always {1} )"
 readonly ACTION_RELOAD="reload(env _FZFTAG_INTERNAL=reload $prog)"
 readonly ACTION_PREVIEW="toggle-preview"
 readonly ACTION_HELP="execute(env _FZFTAG_SHOW=keys $prog | ${(z)ftag_pager} )${(z)FTAG_PRINT}"
+readonly ACTION_QUIT="abort"
 
 # TODO: use or remove
 readonly ACTION_TWF_SWITCH="execute(env FZFTAG_STATE_CHANGE=twf-switch $prog )${(z)FTAG_RELOAD}${FTAG_CHPROMPT}(TWF Tag>)"
@@ -482,6 +485,7 @@ typeset -gA FZFTAG_KEYBINDINGS
 : ${FZFTAG_KEYBINDINGS[V]:=$ACTION_VIEW}
 : ${FZFTAG_KEYBINDINGS[R]:=$ACTION_RELOAD}
 : ${FZFTAG_KEYBINDINGS[P]:=$ACTION_PREVIEW}
+: ${FZFTAG_KEYBINDINGS[Q]:=$ACTION_QUIT}
 : ${FZFTAG_KEYBINDINGS[?]:=$ACTION_HELP}
 
 : ${FZFTAG_KEYBINDINGS[${ftag_modifier}-f]:=$ACTION_FORGIT}
@@ -682,7 +686,7 @@ fi
 local filter
 if [[ -n "$_FZFTAG_RELOAD" ]]; then
   filter="$(<$current_filter)"
-  output="$(tag ${(z)filter} | column -t)"
+  output="$(tag ${(z)filter} | column -ts $'\t')"
 
   if [[ -n "$output" ]]; then
     echo "$output"
@@ -780,7 +784,6 @@ while (( $? != 130 )); do
     | column -t \
     | fzf \
     ${${(z)${(j. .)FZFTAG_OPTS}}//\'} \
-    --keep-right \
     --ansi \
     --query "$FZFTAG_QUERY" \
     --multi \
