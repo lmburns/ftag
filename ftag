@@ -9,8 +9,8 @@
 
 # == Setup == [[[
 emulate -LR zsh
-builtin setopt extendedglob typesetsilent
-# localoptions noksharrays noshortloops warncreateglobal
+builtin setopt extendedglob typesetsilent warncreateglobal noksharrays
+# localoptions noshortloops
 
 0="${${ZERO:-${0:#$ZSH_ARGZERO}}:-${(%):-%N}}"
 0="${${(M)0:#/*}:-$PWD/$0}"
@@ -21,6 +21,7 @@ prog_dir="${0:A:h}"
 # TODO: add support for skim
 # TODO: does query need to be =query?
 # TODO: add support for file paths with spaces
+# TODO: use reply/REPLY
 # Set query as optional args to prevent errors
 local -A opts
 zparseopts -D -A opts h -help s -skim b -boxes c -lolcat t -toilet -\
@@ -258,8 +259,11 @@ function Ftag::dotbare() {
   # If dir is git use dotbare in that dir; else use on dotfiles
   # Brings up own interactive menu
   local -a choice action
+  local final
   Ftag::dep "dotbare" || return 1
-  if [[ $(Ftag::is_git "$@") ]]; then
+  Ftag::is_git "$@" &>/dev/null || local git="no"
+  if [[ $git != "no" ]]; then
+    terminal-notifier -title 'first' -message 'x'
     setopt localoptions noautopushd
     builtin cd -q "$@"
     choice=( ${(@f)"$(dotbare)"} )
@@ -267,6 +271,7 @@ function Ftag::dotbare() {
     final=${action[$(( ${action[(I)dotbare]} + 1 ))]}
     dotbare --git "$final"
   else
+    terminal-notifier -title 'second' -message 'x'
     choice=( ${(@f)"$(dotbare)"} )
     action=( ${(@z)choice[1]} )
     final=${action[$(( ${action[(I)dotbare]} + 1 ))]}
@@ -274,13 +279,10 @@ function Ftag::dotbare() {
   fi
 }
 
-# FIXME: get to work
 functions Ftag::glow() {
   integer mdfiles
-  builtin cd -q "$@"
-  terminal-notifier -title "here1" -message "x"
-  mdfiles=$(command ls *.md | wc -l)
-  (( lsfiles > 0 )) && glow
+  mdfiles=$(fd . -e md -d1 "${~@}" | wc -l)
+  (( mdfiles > 0 )) && glow "${~@}"
 }
 # ]]]
 
@@ -526,7 +528,6 @@ fi
 
 # TODO: actions: delete file
 # TODO: Add another case statement for opening files
-# TODO: Add mdcat/mdv/glow/etc
 if [[ -n "$FZFTAG_ACTION" ]]; then
   clear
   # Get the filename
@@ -620,10 +621,6 @@ if [[ -n "$FZFTAG_ACTION" ]]; then
       ;;
     dotbare)
       Ftag::dotbare "${tag_args:h}"
-      # dotbare --git "${tag_args:h}"
-      # Ftag::is_git "${tag_args:h}" || return 1
-      # cd -q "${tag_args:h}" && dotbare --git
-      # dotbare flog | bat
       ;;
     gpg-edit)
       Ftag::gpg -e "$tag_args"
@@ -635,13 +632,14 @@ if [[ -n "$FZFTAG_ACTION" ]]; then
       Ftag::dua "${tag_args:h}"
       ;;
     twf-edit)
-      Ftag::dep "twf" && Ftag::twf -e "${tag_args:h}"
+      Ftag::dep "twf" && Ftag::twf -e "${tag_args:A:h}"
       ;;
     open-finder)
-      open "${tag_args:h}" && exit 0
+      open "${tag_args:A:h}" && exit 0
       ;;
     glow)
-      Ftag::glow "${tag_args:h}"
+      Ftag::glow "${tag_args:A:h}"
+      # glow "${tag_arg:A:h}"
       ;;
   esac
   clear
@@ -789,10 +787,13 @@ while (( $? != 130 )); do
     --multi \
     --info=inline \
     --pointer '➤' \
+    --no-height \
     --preview-window=':hidden,right:60%' \
     --preview "$FILE_PREV || $DIR_PREV" \
     "${FZFTAG_ACTIONS[@]}"
 done
+
+zle reset-prompt
 # ]]]
 
 # vim: ft=zsh:et:sw=0:ts=2:sts=2:fdm=marker:fmr=[[[,]]]:

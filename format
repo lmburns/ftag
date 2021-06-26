@@ -1,0 +1,174 @@
+#!/usr/bin/env zsh
+
+# typeset -A tags ntags
+# tags[$(tag -f '*')]=$(tag -Ntf '*')
+#
+# print ${${(kv)tags}[1]}
+
+# for k v in "${(kv)tags}"; do
+#   k="%F{1}%B$k%f%b" v="%F{3}$v%f" ntags[${(%)k}]=${(%)v}
+# done
+#
+# print -raC2 -- ${(kv)ntags}
+
+typeset -gAH FTAG
+
+FTAG+=(
+  red    $'\e[38;5;1m'
+  green  $'\e[38;5;2m'
+  yell   $'\e[38;5;3m'
+  blue   $'\e[38;5;4m'
+  magen  $'\e[38;5;5m'
+  cyan   $'\e[38;5;6m'
+  bred   $'\e[01;31m'
+  bgreen $'\e[01;32m'
+  byell  $'\e[01;33m'
+  bblue  $'\e[01;34m'
+  bmagen $'\e[01;35m'
+  bcyan  $'\e[01;36m'
+  res    $'\e[0m'
+)
+
+# TODO: create map to HOME
+
+.colorify-file() {
+  builtin setopt extendedglob typesetsilent noshortloops rcquotes \
+     ${${${+REPLY}:#0}:+warncreateglobal}
+  local file=$1
+  REPLY="${file:+${FTAG[green]}${file}${FTAG[res]}}"
+}
+
+.colorify-tag() {
+  builtin setopt extendedglob typesetsilent noshortloops rcquotes \
+     ${${${+REPLY}:#0}:+warncreateglobal}
+  local tag=$1
+  REPLY="${tag:+${FTAG[bmagen]}${tag}${FTAG[res]}}"
+}
+
+typeset -a tags files
+typeset -A binds
+tags=( ${(f)"$(tag -Ntf '*')"} ) files=( ${(f)"$(tag -f '*')"} )
+
+for ((i=1; i<$#tags; i++)) {
+  binds[${(q)files[$i]}]=$tags[$i]
+}
+
+typeset -a ntags nfiles
+local f t
+# for f in "${files[@]}"; do
+#   .colorify-file "$f"
+#   nfiles+=( "$REPLY" )
+# done
+#
+# for t in "${tags[@]}"; do
+#   .colorify-tag "$t"
+#   ntags+=( "$REPLY" )
+# done
+
+local -a packs
+for f in "${(k)binds[@]}"; do
+  tag="${binds[$f]}"
+  packs+=( "${(q)f} ${(q)tag//,/, }" )
+done
+# packs=( "${(on)packs[@]}" )
+
+integer longest=0
+local -a unpacked
+for t in "${packs[@]}"; do
+  unpacked=( "${(Q@)${(z@)t}}" )
+  [[ "${#unpacked[1]}" -gt "$longest" ]] && longest="${#unpacked[1]}"
+done
+
+for t in "${packs[@]}"; do
+  unpacked=( "${(Q@)${(z@)t}}" )
+  .colorify-tag "$unpacked[2]"
+  builtin print -n "${(r:longest+1:: :)unpacked[1]} $REPLY"
+  builtin print
+done
+
+# print -rl ${nfiles:^ntags}
+
+function format_length() {
+  integer longest=0 longest_left=0 cur_left_len=0 count=1
+  local f
+  for f in "${(@)${nfiles:^ntags}}"; do
+    [[ -z "$f" ]] && continue
+    f="${(Q)f}"
+
+    if (( count ++ %2 != 0 )); then
+      [[ "${#f}" -gt "$longest_left" ]] && longest_left="${#f}"
+      curr_left_len="${#f}"
+    else
+      curr_left_len+="${#f}"
+      curr_left_len+=1
+      [[ "$curr_left_len" -gt "$longest" ]] && longest="$curr_left_len"
+    fi
+  done
+
+  local answer=""
+  count=1
+  for a in "${(@)${nfiles:^ntags}}"; do
+    [[ -z "$f" ]] && continue
+    f="${(Q)f}"
+
+    if (( COLUMNS >= longest )); then
+      if (( count ++ % 2 != 0 )); then
+        answer+="${(r:longest_left+1:: :)f}"
+      else
+        answer+="$f"$'\n'
+      fi
+    else
+      answer+="$f"$'\n'
+    fi
+  done
+  REPLY="$answer"
+  (( COLUMNS >= longest && count % 2 == 0 )) && REPLY="$REPLY"$'\n'
+}
+
+# .zinit-show-completions()
+# .zinit-format-functions()
+
+##########################################
+# local -i longest
+# for (( i=1; i<$#tags; i++ )) {
+#   # k="%F{1}%B$filez[$i]%f%b" v="%F{3}$tags[$i]%f"
+#   # binds[${(%)k}]=${(%)v}
+#   [[ "${#files[$i]}" -gt "$longest" ]] && longest="${#files[$i]}"
+# }
+#
+# local -a fname
+# for (( i=1; i<$#tags; i++ )) {
+#   # fname=( "${(Q@)${(z@)files[$i]}}" )
+#   .colorify "${(Qz)tags[$i]}"
+#   builtin print -n "${(l:longest+1:: :)files[$i]} $REPLY"
+# }
+
+##########################################
+# local -a tagnames
+# for (( i=1; i<$#tags; i++ )) {
+#   tagnames+=( "${(q)files[$i]}" "${(q)tags[$i]//,/, }" )
+# }
+# tagnames=( "${(on)tagnames[@]}" )
+#
+# local t
+# local -i longest
+# local -a unpacked
+# for t in "${tagnames[@]}"; do
+#   # k="%F{1}%B$filez[$i]%f%b" v="%F{3}$tags[$i]%f"
+#   # binds[${(%)k}]=${(%)v}
+#   unpacked=( "${(Q@)${(z@)t}}" )
+#   [[ "${#unpacked[1]}" -gt "$longest" ]] && longest="${#unpacked[1]}"
+# done
+#
+# local -a fname
+# for t in "${tagnames[@]}"; do
+#   # fname=( "${(Q@)${(z@)files[$i]}}" )
+#   unpacked=( "${(Q@)${(z@)t}}" )
+#   .colorify "$unpacked[2]"
+#   builtin print -n "${(l:longest+1:: :)unpacked[1]} $REPLY"
+#   # builtin print
+# done
+
+
+# print -raC2 -- ${(kv)binds}
+# print -rC2 -- "${(Ok)binds} ${(Ov)keys}"
