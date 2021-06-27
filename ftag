@@ -9,8 +9,8 @@
 
 # == Setup == [[[
 emulate -LR zsh
-builtin setopt extendedglob typesetsilent warncreateglobal noksharrays
-# localoptions noshortloops
+builtin setopt extendedglob typesetsilent noksharrays
+# localoptions noshortloops warncreateglobal
 
 0="${${ZERO:-${0:#$ZSH_ARGZERO}}:-${(%):-%N}}"
 0="${${(M)0:#/*}:-$PWD/$0}"
@@ -49,8 +49,9 @@ map2=(
 # TODO: add support for skim
 # TODO: does query need to be =query?
 # TODO: add support for file paths with spaces
-# TODO: use reply/REPLY
 # TODO: be consistent with FTAG/FZFTAG for user vars
+# TODO: add option to view all local files since new method doesn't list them
+# TODO: map-back multiple selection
 # Set query as optional args to prevent errors
 local -A opts
 zparseopts -D -A opts h -help s -skim b -boxes c -lolcat t -toilet -\
@@ -116,11 +117,11 @@ function Ftag::declare() {
 # FUNCTION: Ftag::color-tag [[[
 # $1 - Tag to color
 function Ftag::color-tag() {
-  builtin setopt extendedglob typesetsilent noshortloops rcquotes \
-    ${${${+REPLY}:#0}:+warncreateglobal}
-
+  builtin setopt extendedglob typesetsilent noshortloops rcquotes
+    # ${${${+REPLY}:#0}:+warncreateglobal}
+  typeset -gH REPLY
   local tag=$1
-  REPLY="${tag:+${FTAG[bmagen]}${tag}${FTAG[res]}}"
+  REPLY="${tag:+${FTAG[bmagen]}${${tag//(#m)(\|)/${FTAG[blue]}${MATCH}${FTAG[res]}${FTAG[bmagen]}}}${FTAG[res]}}"
 }
 # ]]]
 
@@ -130,6 +131,7 @@ function Ftag::map-short() {
   builtin setopt extendedglob typesetsilent noshortloops rcquotes
     # ${${${+SHORT}:#0}:+warncreateglobal}
   typeset -gH SHORT
+  local -a match mbegin mend
   # Use 'O' as flag else use another array for $HOME becuase hash is unsorted
   # Color: none
   # SHORT="${${1/(#b)(#s)(${(~j:|:)${(O@k)map}}|)/$map[$match[1]]}}"
@@ -152,6 +154,7 @@ function Ftag::map-short() {
 function Ftag::map-back() {
   builtin setopt extendedglob typesetsilent noshortloops rcquotes
   typeset -gH back
+  local -a match mend mbegin
 
   if [[ $1 = /* ]]; then
     back="$1"
@@ -172,26 +175,40 @@ function Ftag::map-back() {
 # Tag wrapper to color the output
 # TODO: add a header and column separator
 function Ftag::tag() {
-  typeset -a tags files
-  typeset -A binds
-  tags=( ${(f)"$(tag -Ntf '*')"} )
-  files=( ${(f)"$(tag -f '*')"} )
+  builtin setopt localoptions nullglob extendedglob nokshglob noksharrays
+  # tags=( ${(f)"$(tag -Ntf '*')"} )
+  # files=( ${(f)"$(tag -f '*')"} )
 
+  local -a fargs targs
+  fargs=( "${(Q@)${(@z)@}}" )
+
+  (( ${+fargs[(r)-*f*]} )) && targs+=( "-Ntf" )
+  if (( $#fargs == 3 )) && [[ "${fargs[-1]}" = (*/*|\.) ]]; then
+    targs+=( "${fargs[-2]}" "${fargs[-1]}" )
+  elif (( $#fargs == 2 )) && [[ "${fargs[-1]}" = \* ]]; then
+    targs+=( "${fargs[-1]}" )
+  fi
+
+  local -a tags files
+  tags=( ${(@f)"$(tag ${(z)targs})"} )
+  files=( ${(@f)"$(tag ${(z)fargs})"} )
+
+  local -A binds
+  local f t i tag
   for ((i=1; i<$#tags; i++)) {
     binds[${(q)files[$i]}]=$tags[$i]
   }
 
-  local f t
   local -a packs
   for f in "${(k)binds[@]}"; do
     tag="${binds[$f]}"
-    packs+=( "${(q)f} ${(q)tag//,/, }" )
+    packs+=( "${(q)f} ${(q)tag//,/\|}" )
   done
   # Turns on 'garriglous' mode
   # packs=( "${(on)packs[@]}" )
 
   integer longest=0
-  local -a unpacked formatted
+  local -a unpacked
   for t in "${packs[@]}"; do
     unpacked=( "${(Q@)${(z@)t}}" )
     [[ "${#unpacked[1]}" -gt "$longest" ]] && longest="${#unpacked[1]}"
@@ -317,7 +334,9 @@ function Ftag::autojump() {
 # TODO: create a prompt to switch paths
 function Ftag::path::find() {
   # TAG:
-  tag -tf '*' $FZFTAG_PATH | fzf --prompt ' Path> '
+  Ftag::tag "-f * $FZFTAG_PATH" | fzf --prompt ' Path> '
+  # tag -tf '*' $FZFTAG_PATH | fzf --prompt ' Path> '
+
   # builtin cd -q "$FZFTAG_PATH" && \
     # tag -el $FZFTAG_PATH | fzf --prompt ' Path> '
 }
@@ -799,6 +818,7 @@ fi
 # FIXME: try and use this instead of awk
 # declare -a input; input=($@)
 # print -l "${input[@]/(#b)([^\/]##\/)##([^\/]##)*/${match[3]}}"
+# print "${list[@]/(#m)*/${${(s:,:)MATCH}[4]}}"
 
 if [[ -n "$FZFTAG_ACTION" ]]; then
   clear
@@ -832,8 +852,9 @@ if [[ -n "$FZFTAG_ACTION" ]]; then
     (add)
       local fname fdir tag file
       Ftag::parse_format "add tags"
-      vared -cp "Add tags for ${pathf:t3}: " tag
-      for file in "${(f)pathf[@]}"; do
+      Ftag::map-back "$pathf"
+      vared -cp "Add tags for ${back:t3}: " tag
+      for file in "${(f)back[@]}"; do
         fname="${file:t}" fdir="${file:h}"
         if (( FZFTAG_WTAG > 1 )) {
           Ftag::wutag -a "$fdir" "$fname" "$tag"
@@ -862,14 +883,16 @@ if [[ -n "$FZFTAG_ACTION" ]]; then
       done
       ;;
     (ripgrep)
-      local fname fdir yesno keyw
+      local yesno keyw
+      # FIX: error not a file
       Ftag::parse_format "ripgrep search"
+      Ftag::map-back "$pathf"
       vared -cp "Local [Y/n]: " yesno
       vared -cp "Ripgrep keyword: " keyw
       [[ "$yesno" == (#i)n ]] && {
         () {
             setopt localoptions noautopushd
-            builtin cd -q "${pathf:h}"
+            builtin cd -q "${back:h}"
             Ftag::RG "$keyw"
           };
         } || Ftag::RG "$keyw"
@@ -879,7 +902,8 @@ if [[ -n "$FZFTAG_ACTION" ]]; then
       ;;
     (edit)
       # TODO: maybe change to open
-      ${EDITOR:-vim} "$pathf"
+      Ftag::map-back "$pathf"
+      ${EDITOR:-vim} "$back"
       ;;
     (file-manager)
       $FTAG_FILEMANAGER "${pathf:h}"
@@ -982,22 +1006,22 @@ local FZFTAG_CMD dir_switch
 if [[ -n "$FZFTAG_STATE_CHANGE" ]]; then
   case "$FZFTAG_STATE_CHANGE" in
     local)
-      FZFTAG_CMD="-l"
+      FZFTAG_CMD="-f * ."
       ;;
     global)
-      FZFTAG_CMD="-tf *"
+      FZFTAG_CMD="-f *"
       ;;
     path)
       dir_switch=$(Ftag::path::find)
-      FZFTAG_CMD="-tf * ${(q)dir_switch}"
+      FZFTAG_CMD="-f * ${(q)dir_switch}"
       ;;
     zoxide)
       dir_switch=$(Ftag::zoxide)
-      FZFTAG_CMD="-tf * ${(q)dir_switch}"
+      FZFTAG_CMD="-f * ${(q)dir_switch}"
       ;;
     autojump)
       dir_switch=$(Ftag::autojump)
-      FZFTAG_CMD="-tf * ${(q)dir_switch}"
+      FZFTAG_CMD="-f * ${(q)dir_switch}"
       ;;
   esac
 
@@ -1011,11 +1035,13 @@ local filter
 if [[ -n "$_FZFTAG_RELOAD" ]]; then
   filter="$(<$current_filter)"
   # TAG:
-  output="$(tag ${(z)filter} | column -ts $'\t')"
+  # output="$(tag ${(z)filter} | column -ts $'\t')"
+  output="$(Ftag::tag "${(z)filter}")"
 
   if [[ -n "$output" ]]; then
     echo "$output"
   else
+    # FIXME: unsure if ever reaches here
     echo "No tags were found: $filter"
   fi
   exit
@@ -1054,32 +1080,32 @@ while (( $? != 130 )); do
   Ftag::opts "c lolcat" && export FZFTAG_LOLCAT=1
   Ftag::opts "t toilet" && export FZFTAG_TOILET=1
 
-  local tag_arguments
+  local -a tag_arguments
   # If writeable, that means theres a state change
   if [[ -w "$current_filter" ]]; then
-    tag_arguments="$(<$current_filter)"
+    tag_arguments=( ${(@f)"$(<$current_filter)"} )
   else
   # First time ran
     if Ftag::opts "l local"; then
-      tag_arguments="-l"
+      # tag_arguments=( "-l" )
+      tag_arguments=( "-f" "*" "." )
     elif Ftag::opts "p path"; then
-      tag_arguments="-tf * $FZFTAG_PATH"
+      tag_arguments=( "-f" "*" "$FZFTAG_PATH" )
     elif Ftag::opts "z zoxide"; then
       Ftag::dep -e "zoxide"
       dir_switch=$(Ftag::zoxide)
-      tag_arguments="-tf * $dir_switch"
+      tag_arguments=( "-f" "*" "$dir_switch" )
     elif Ftag::opts "j jump"; then
       Ftag::dep -e "autojump"
       dir_switch=$(Ftag::autojump)
-      tag_arguments="-tf * $dir_switch"
+      tag_arguments=( "-f" "*" "$dir_switch" )
     else
       # Don't quote *
-      tag_arguments="-tf ${@:-*}"
+      tag_arguments=( "-f" "${@:-*}" )
     fi
-    echo "$tag_arguments" >! $current_filter
+    echo "${tag_arguments[@]}" >! $current_filter
   fi
 
-  # TODO: pickup with-nth on reload
   # Set initial prompt
   local -a FZFTAG_OPTS
   if Ftag::opts "l local" || [[ "$FZFTAG_STATE_CHANGE" == "local" ]]; then
@@ -1097,7 +1123,8 @@ while (( $? != 130 )); do
 
   if [[ "${_FZFTAG_INTERNAL}" == "reload" ]]; then
     # TAG:
-    tag "${(z)tag_arguments}" | column -t
+    # tag "${(z)tag_arguments}" | column -t
+    Ftag::tag "${(z)tag_arguments}"
     exit $?
   fi
 
@@ -1108,7 +1135,7 @@ while (( $? != 130 )); do
   FILE_PREV="([[ -f {1} ]] && $ftag_file_prev {1})"
   DIR_PREV="([[ -d {1} ]] && $ftag_dir_prev {1} | less)"
   # TAG:
-  tag "${(z)tag_arguments}" \
+  Ftag::tag "${(z)tag_arguments}" \
     | column -t \
     | fzf \
     ${${(z)${(j. .)FZFTAG_OPTS}}//\'} \
