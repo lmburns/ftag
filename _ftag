@@ -1,28 +1,19 @@
 #compdef ftag
 
-setopt localoptions warncreateglobal typesetsilent
-
-typeset -a local_tags
-_tags_local() {
-  local_tags=( "${(fu)$(tag -Nl)}" )
-}
-
-typeset -a global_tags
-_tags_global() {
-  global_tags=( "${(fu)$(tag -tNf '*')}" )
-}
+setopt localoptions warncreateglobal typesetsilent extendedglob
 
 autoload -U is-at-least
-typeset -a _arguments_options
-local ret=1
+typeset -a _arg_opts
 
 if is-at-least 5.2; then
-    _arguments_options=(-s -S -C)
+    _arg_opts=(-s -S -C)
 else
-    _arguments_options=(-s -C)
+    _arg_opts=(-s -C)
 fi
 
-local context curcontext="$curcontext" state line arguments
+# local context curcontext="$curcontext" state line ret=1
+local state ret=1
+typeset -a arguments
 
 arguments=(
     {-w,--wutag}'[Also tag files with wutag]'
@@ -36,30 +27,34 @@ arguments=(
     {-j,--jump}'[Start zoxide to select directory to use tags]'
   )
 
-_arguments "${_arguments_options[@]}" $arguments \
-          && ret=0
-          # '*: :->args' \
+_arguments "${_arg_opts[@]}" $arguments \
+    && ret=0
+
+# '*: :->tags'
 
 case $state in
   query)
-    # Specify all tags explicitly for query
-    _tags_local
-    _tags_global
-    _alternative 'gtags:-- Global Tags --:compadd -a - global_tags' \
-      'ltags:-- Local Tags --:compadd -a - local_tags' && \
-      ret=0
-    ;;
+    local -a tags=( ${(@u)${(@s:,:)${(@f)"$(tag -Nl)"}}} )
+    local -a gtags=( ${${(@f)"$(tag --usage)"}//(#m)*/${${(s: :)${MATCH}//[[:space:]]##/ }[2]}} )
+    _alternative \
+      'tags:--Local Tags --:compadd -a - tags' \
+      'gtags:--Global Tags--:compadd -a - gtags' && \
+          ret=0
+  ;;
   local_tags)
-    # List only local tags for '-l'
-    _tags_local
-    _describe -t local_tags '-- Local Tags --' local_tags && ret=0
-    ;;
+    local tags=( ${(@u)${(@s:,:)${(@f)"$(tag -Nl)"}}} )
+    _describe -t tags 'Local Tags' tags && \
+        ret=0
+  ;;
   *)
-    # Global search is default
-    _tags_local
-    _tags_global
-    _alternative 'gtags:-- Global Tags --:compadd -a - global_tags' \
-      'ltags:-- Local Tags --:compadd -a - local_tags' && \
-      ret=0
-    ;;
+    typeset -a tags=( ${(@u)${(@s:,:)${(@f)"$(tag -Nl)"}}} )
+    typeset -a gtags=(${${(@f)"$(tag --usage)"}//(#m)*/${${(s: :)${MATCH}//[[:space:]]##/ }[2]}})
+    _alternative \
+      'tags:--Local Tags --:compadd -a - tags' \
+      'gtags:--Global Tags--:compadd -a - gtags' \
+      'arguments:--Options--:compadd -a - arguments' && \
+          ret=0
+  ;;
 esac
+
+return $ret
