@@ -158,10 +158,10 @@ function Ftag::tag() {
   local -a targs tags fargs files tmp
   fargs=( "${(Q@)${(@z)@}}" )
 
-  # if (( WRAPPER == 1 )) {
   local action=${fargs[1]#-}
   case "$fargs" in
     (-s*|--set*)
+      # Wrapper only
       [[ $#fargs -eq 3 && $fargs[1] = -(s|-set) && $fargs = -(s*|-set*)
       ]] && {
         command tag --set "$fargs[2]" "$fargs[3]" 2>/dev/null && {
@@ -170,21 +170,23 @@ function Ftag::tag() {
       }
     ;;
   (-r*|--remove*)
+    # Wrapper only
     [[ $#fargs -eq 3 && $fargs[1] = -(r|-remove) && $fargs = -(r*|-remove*)
     ]] && {
       command tag --remove "$fargs[2]" "$fargs[3]" 2>/dev/null && {
         +Ftag::msg -p "{brblue}Tag:{res} $fargs[2]"$'\t'"{brblue}Removed:{res} $fargs[3]"
       } || +Ftag::msg -p '{err}tag cannot be removed'
     }
-  ;;
+    ;;
   (-a*|--add*)
+    # Wrapper only
     [[ $#fargs -eq 3 && $fargs[1] = -(a|-add) && $fargs = -(a*|-add*)
     ]] && {
       command tag --add "$fargs[2]" "$fargs[3]" 2>/dev/null && {
         +Ftag::msg -p "{brblue}Tag:{res} $fargs[2]"$'\t'"{brblue}Added:{res} $fargs[3]"
       } || +Ftag::msg -p '{err}tag cannot be added'
     }
-  ;;
+    ;;
   (-l|--list)
     [[ $#fargs -eq 1 && $fargs[1] = -(l|-list) ]] && {
       tmp=( ${${${(@)${(@f)"$(tag -l)"}/(#m)([[:space:]]|(#e))/---${MATCH}}//[[:space:]]/}//(#m)---(#e)/--- } )
@@ -194,22 +196,40 @@ function Ftag::tag() {
   ;;
   (-*f*|*--find*)
     targs+=( "-Ntf" )
-    if [[ $#fargs -eq 3 && "${fargs[-1]}" = (*/*|\.) ]]; then
+    if [[ $#fargs -eq 3 && $~fargs[-1] = (#s)(\~|\/|.##)*/#* ]]; then
       targs+=( "${fargs[-2]}" "${fargs[-1]}" )
-    elif [[ $#fargs -eq 2 && "${fargs[-1]}" = (\*|[a-zA-Z0-9]##) ]]; then
+    elif [[ $#fargs -eq 2 && "${fargs[-1]}" = (\*|[[:alnum:]]##) ]]; then
       targs+=( "${fargs[-1]}" )
     fi
     tags=( ${(@f)"$(tag ${(z)targs})"} )
     files=( ${(@f)"$(tag ${(z)fargs})"} )
-  ;;
-  (-u|--usage)
+    ;;
+  (-u*|--usage*)
+    # Wrapper only
     () {
       emulate -LR zsh
-      setopt extendedglob warncreateglobal noksharrays noshortloops
-      local -a gcnts=( ${${(@f)"$(tag --usage)"}//(#m)*/${${(s: :)${MATCH}//[[:space:]]##/ }[1]}} )
-      local -a gtags=( ${${(@f)"$(tag --usage)"}//(#m)*/${${(s: :)${MATCH}//[[:space:]]##/ }[2]}} )
+      setopt extendedglob warncreateglobal noksharrays noshortloops nokshglob
+      local -a tcnts ttags
+      if [[ $#fargs -eq 1 && $fargs[1] = -(u|-usage) ]] {
+        tcnts=( ${${(@f)"$(tag --usage)"}//(#m)*/${${(s: :)${MATCH}//[[:space:]]##/ }[1]}} )
+        ttags=( ${${(@f)"$(tag --usage)"}//(#m)*/${${(s: :)${MATCH}//[[:space:]]##/ }[2]}} )
+      } elif [[ $#fargs -le 3 && $fargs[1] = -(u|-usage) && \
+                ( $~fargs[2] = (#s)(\~|\/|.##)*/#* || $~fargs[3] = (#s)(\~|\/|.##)*/#* ) ]] {
+        tcnts=( ${${(@f)"$(tag --usage ${(z)~fargs[2]})"}//(#m)*/${${(s: :)${MATCH}//[[:space:]]##/ }[1]}} )
+        ttags=( ${${(@f)"$(tag --usage ${(z)~fargs[2]})"}//(#m)*/${${(s: :)${MATCH}//[[:space:]]##/ }[2]}} )
+        # Normal tag does not do this
+        [[ $fargs[2] = [[:ascii:]]## && $~fargs[3] = (#s)(\~|\/|.##)*/#* ]] && {
+          local exists=${(M)ttags:#${fargs[2]}}
+          [[ -n $exists ]] && {
+            tcnts=${(@)${tcnts[${ttags[(rI)$exists]}]}}
+            Ftag::color-tag "$exists"
+            +Ftag::msg -p "{brgreen}$tcnts{res} $REPLY"
+            return 0
+          } || { +Ftag::msg -p "{err}{cyan}$fargs[2]{res} is not an existing tag"; return 1; }
+        }
+      }
       local -a packs unpacked;    integer i longest=0 adjust;     local t
-      for (( i=1; i<$#gtags; i++ )) { packs+=( "${(q)${gcnts[$i]}} ${(q)${gtags[$i]}}" ); }
+      for (( i=1; i<$#ttags; i++ )) { packs+=( "${(q)${tcnts[$i]}} ${(q)${ttags[$i]}}" ); }
       for t ($packs) { unpacked=( "${(Q@)${(z@)t}}" ); (( $#unpacked[1] > $longest )) && longest=$#unpacked[1]; }
       adjust=$(( ${#FTAG[brgreen]} + ${#FTAG[res]} ))
       for t ($packs) {
@@ -220,12 +240,15 @@ function Ftag::tag() {
         builtin print
       }
     }
-  ;;
+    ;;
   (-h|--help)
-    # $'\n'"${${${(@)$(command tag --help)}//(#m)(${(~j:|:)__FTAG_EXTERNAL_OPTS})/{yell\}${MATCH}{res\}}//(#m)(-##[[:alnum:]]##)/{green\}${MATCH}{res\}}"
+    # Wrapper only
     +Ftag::msg -p "{bgreen}External tag help:{res}" \
       $'\n'"${${${(@)$(command tag --help)}//(#m)(${(~j:|:)__FTAG_EXTERNAL_OPTS})/${FTAG[yell]}${MATCH}${FTAG[res]}}//(#m)(-##[[:alnum:]]##)/${FTAG[green]}${MATCH}${FTAG[res]}}"
-  ;;
+    ;;
+  (*)
+    +Ftag::msg -p "{err}flag is not supported"
+    ;;
   esac
 
   integer i longest=0
@@ -1427,7 +1450,7 @@ if [[ -n "$_FZFTAG_RELOAD" ]] {
 # SECTION: == Main Loop == [[[
 # Used for fzf preview
 # Variables have to be exported to be picked up on the next iteration of the loop
-typeset -giH {FZFTAG_WTAG,FZFTAG_BOXES,FZFTAG_LOLCAT,FZFTAG_TOILET,WRAPPER,VERBOSE,NO_COLOR}=0
+typeset -giH {FZFTAG_WTAG,FZFTAG_BOXES,FZFTAG_LOLCAT,FZFTAG_TOILET,VERBOSE,NO_COLOR}=0
 typeset -gH  FZFTAG_STATE_CHANGE FZFTAG_FONT
 while (( $? != 130 )) {
   VERBOSE=$#verbose
@@ -1508,7 +1531,6 @@ while (( $? != 130 )) {
   }
 
   Ftag::opts "W wrapper" && {
-    export WRAPPER=1
     Ftag::tag "${wrapper#-W}"
     return ret
   }

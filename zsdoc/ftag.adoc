@@ -36,6 +36,7 @@ FUNCTIONS
  Ftag::map-back
  Ftag::map-short
  Ftag::opts
+ Ftag::parallel
  Ftag::parse_format
  Ftag::path::find
  Ftag::show_keys
@@ -54,7 +55,7 @@ DETAILS
 Script Body
 ~~~~~~~~~~~
 
-Has 605 line(s). Calls functions:
+Has 651 line(s). Calls functions:
 
  Script-Body
  |-- +Ftag::msg
@@ -68,6 +69,10 @@ Has 605 line(s). Calls functions:
  |-- Ftag::dua
  |   `-- Ftag::dep
  |-- Ftag::forgit
+ |   |-- Ftag::dep
+ |   |-- Ftag::is_git
+ |   `-- OS::notify
+ |       `-- Ftag::dep
  |-- Ftag::gitui
  |   `-- Ftag::dep
  |-- Ftag::glow
@@ -84,9 +89,9 @@ Has 605 line(s). Calls functions:
  |   `-- Ftag::toilet
  |       `-- +Ftag::msg
  |-- Ftag::tag
+ |   |-- +Ftag::msg
  |   |-- Ftag::color-tag
- |   |-- Ftag::map-short
- |   `-- Ftag::opts
+ |   `-- Ftag::map-short
  |-- Ftag::twf
  |-- Ftag::usage
  |   |-- +Ftag::msg
@@ -98,9 +103,9 @@ Has 605 line(s). Calls functions:
  `-- OS::notify
      `-- Ftag::dep
 
-Uses feature(s): _export_, _read_, _setopt_, _vared_, _zmodload_, _zparseopts_
+Uses feature(s): _export_, _read_, _setopt_, _vared_, _zle_, _zmodload_, _zparseopts_
 
-_Exports (environment):_ FZFTAG_BOXES [big]*//* FZFTAG_LOLCAT [big]*//* FZFTAG_PATH [big]*//* FZFTAG_QUERY [big]*//* FZFTAG_TOILET [big]*//* FZFTAG_WTAG [big]*//* LESS
+_Exports (environment):_ FZFTAG_BOXES [big]*//* FZFTAG_FONT [big]*//* FZFTAG_LOLCAT [big]*//* FZFTAG_PATH [big]*//* FZFTAG_QUERY [big]*//* FZFTAG_TOILET [big]*//* FZFTAG_WTAG [big]*//* LESS
 
 +Ftag::msg
 ~~~~~~~~~~
@@ -111,7 +116,7 @@ ____
  # Map colors to FTAG array and recognize errors and warnings
 ____
 
-Has 16 line(s). Doesn't call other functions.
+Has 17 line(s). Doesn't call other functions.
 
 Uses feature(s): _setopt_
 
@@ -120,6 +125,7 @@ Called by:
  Ftag::boxes
  Ftag::env_vars
  Ftag::lolcat
+ Ftag::tag
  Ftag::toilet
  Ftag::usage
  Script-Body
@@ -218,10 +224,12 @@ Ftag::declare
 
 ____
  # FUNCTION: Ftag::declare [[[
- # Declare global readonly variable
+ # Declare global variable for config
 ____
 
-Has 6 line(s). Doesn't call other functions.
+Has 9 line(s). Doesn't call other functions.
+
+Uses feature(s): _eval_
 
 Called by:
 
@@ -234,6 +242,8 @@ ____
  # == SECTION: Functions: Formatting and Display == [[[
  # FUNCTION: Ftag::default_header [[[
  # Default header displayed on commands asking for input
+ # Sub-Zero // ansi_shadow / ANSI_regular
+ # big / doom / small / standard
 ____
 
 Has 9 line(s). Doesn't call other functions.
@@ -245,6 +255,8 @@ Called by:
  Ftag::parse_format
  Ftag::usage
  Script-Body
+
+_Environment variables used:_ FZFTAG_FONT
 
 Ftag::dep
 ~~~~~~~~~
@@ -264,6 +276,7 @@ Called by:
  Ftag::copy
  Ftag::dotbare
  Ftag::dua
+ Ftag::forgit
  Ftag::gitui
  OS::notify
  Script-Body
@@ -331,12 +344,17 @@ Ftag::forgit
 ____
  # FUNCTION: Ftag::forgit [[[
  # Open directory if git and use forgit
- # TODO: figure out how to source & add this for everyone
 ____
 
-Has 33 line(s). Doesn't call other functions.
+Has 50 line(s). Calls functions:
 
-Uses feature(s): _eval_, _source_
+ Ftag::forgit
+ |-- Ftag::dep
+ |-- Ftag::is_git
+ `-- OS::notify
+     `-- Ftag::dep
+
+Uses feature(s): _source_, _zmodload_
 
 Called by:
 
@@ -346,7 +364,6 @@ Ftag::format_length
 ~~~~~~~~~~~~~~~~~~~
 
 ____
- # SECTION: == Unused == [[[
  # FUNCTION: Ftag::format_length [[[
  # Could use to split lines based on $#COLUMN
 ____
@@ -382,7 +399,7 @@ ____
  # Open directory to browse markdown files
 ____
 
-Has 3 line(s). Doesn't call other functions.
+Has 5 line(s). Doesn't call other functions.
 
 Called by:
 
@@ -417,6 +434,7 @@ Has 1 line(s). Doesn't call other functions.
 Called by:
 
  Ftag::dotbare
+ Ftag::forgit
  Script-Body
 
 Ftag::lolcat
@@ -444,7 +462,7 @@ ____
  # $1 - File path to map back to original path
 ____
 
-Has 11 line(s). Doesn't call other functions.
+Has 12 line(s). Doesn't call other functions.
 
 Uses feature(s): _setopt_
 
@@ -482,8 +500,22 @@ Has 1 line(s). Doesn't call other functions.
 
 Called by:
 
- Ftag::tag
  Script-Body
+
+Ftag::parallel
+~~~~~~~~~~~~~~
+
+____
+ # SECTION: == Unused == [[[
+ # FUNCTION: Ftag::parallel [[[
+ # An attempt to make reloading faster with many tags
+____
+
+Has 7 line(s). Doesn't call other functions.
+
+Uses feature(s): _zle_
+
+Not called by script or any function (may be e.g. a hook, a Zle widget, etc.).
 
 Ftag::parse_format
 ~~~~~~~~~~~~~~~~~~
@@ -553,12 +585,12 @@ ____
  # TODO: speed up
 ____
 
-Has 47 line(s). Calls functions:
+Has 146 line(s). Calls functions:
 
  Ftag::tag
+ |-- +Ftag::msg
  |-- Ftag::color-tag
- |-- Ftag::map-short
- `-- Ftag::opts
+ `-- Ftag::map-short
 
 Uses feature(s): _setopt_
 
@@ -574,7 +606,7 @@ ____
  # FUNCTION: Ftag::toilet [[[
 ____
 
-Has 3 line(s). Calls functions:
+Has 5 line(s). Calls functions:
 
  Ftag::toilet
  `-- +Ftag::msg
@@ -687,5 +719,6 @@ Has 3 line(s). Calls functions:
 
 Called by:
 
+ Ftag::forgit
  Script-Body
 

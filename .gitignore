@@ -21,4 +21,9 @@ zsdoc/data
 
 .DS_Store
 helper/*
+# Testing scripts
 xy
+tt
+
+# CTags
+tags
