@@ -18,8 +18,11 @@ prog="${0:A:t}"   prog_dir="${0:A:h}"
 
 # TODO: does query need to be =query?
 # TODO: confirm support for file paths with spaces
-# TODO: be consistent with FTAG/FZFTAG for user vars
+
 # TODO: find a way to display hidden tagged files
+# TODO: local reload errored out
+# TODO: open with
+# TODO: custom color
 # ]]] == END: Setup
 
 # SECTION: == Functions: Helper == [[[
@@ -35,14 +38,19 @@ function +Ftag::msg() {
   msg=${${(j: :)${@}}//\%/%%}
   msg=${msg/(#b)\{(warn|err)\}/\{bred\}${${${(M)match:#warn}:+\[Warning\]}:-\[Error\]}:\{res\} }
   msg=${${msg//(#b)([\{]([^\}]##)[\}])/${FTAG[${${match[1]}//([\{\}])/}]}}}
-  if [[ -n $opt && $opt = -p ]] {
-    [[ -n ${(M)msg:#(#i)*(warn*|err*)*} ]] && {
-      print -ru2 -- $msg && ret=1
-    } || print -r -- $msg && ret=0
-  return ret
-  } else {
+
+  if [[ $opt = -x ]] {
     REPLY=${msg}${FTAG[res]}
+    return
+  } else {
+    [[ -n ${(M)msg:#(#i)*(warn*|err*)*} ]] && {
+      builtin print -u2 ${opt:#--} -- $msg
+    } || builtin print -Pr ${opt:#--} -- $msg
   }
+
+  # FIX: allow %F
+  # msg=${${msg//(#b)(([\\]|(%F))([\{]([^\}]##)[\}])|([\{]([^\}]##)[\}])([^\%\{\\]#))/${FTAG[${${match[1]}//([\{\}])/}]}}}
+  # msg=${${msg//(#b)((|(%F))[\{]([^\}]##)[\}])/${(M)match[1]:#%F*}:+$match[1]}:-${FTAG[${${match[1]}//([\{\}])/}]}}
 }
 # ]]]
 
@@ -52,7 +60,7 @@ function +Ftag::msg() {
 function Ftag::dep() {
   [[ $1 = -e ]] && { integer err=1; shift; }
   if (( err )); then
-    { (( ${+commands[$1]} )); return 0 } || { Ftag::msg -p "{err}{green}${1}{res} is not in {yell}\$PATH{res}"; return 1; }
+    { (( ${+commands[$1]} )); return 0 } || { Ftag::msg "{err}{green}${1}{res} is not in {yell}\$PATH{res}"; return 1; }
   else
     (( ${+commands[$1]} )); return 0
   fi
@@ -156,24 +164,24 @@ function Ftag::tag() {
         [[ $#fargs -eq 3 && $fargs[1] = -(s|-set) && $fargs = -(s*|-set*)
         ]] && {
           command tag --set "$fargs[2]" "$fargs[3]" 2>/dev/null && {
-            +Ftag::msg -p "{brblue}Tag:{res} $fargs[2]"$'\t'"{brblue}Set:{res} $fargs[3]"
-          } || +Ftag::msg -p '{err}tag cannot be set'
+            +Ftag::msg "{brblue}Tag:{res} $fargs[2]"$'\t'"{brblue}Set:{res} $fargs[3]"
+          } || +Ftag::msg '{err}tag cannot be set'
         }
         ;;
       (-r*|--remove*)
         [[ $#fargs -eq 3 && $fargs[1] = -(r|-remove) && $fargs = -(r*|-remove*)
         ]] && {
           command tag --remove "$fargs[2]" "$fargs[3]" 2>/dev/null && {
-            +Ftag::msg -p "{brblue}Tag:{res} $fargs[2]"$'\t'"{brblue}Removed:{res} $fargs[3]"
-          } || +Ftag::msg -p '{err}tag cannot be removed'
+            +Ftag::msg "{brblue}Tag:{res} $fargs[2]"$'\t'"{brblue}Removed:{res} $fargs[3]"
+          } || +Ftag::msg '{err}tag cannot be removed'
         }
         ;;
       (-a*|--add*)
         [[ $#fargs -eq 3 && $fargs[1] = -(a|-add) && $fargs = -(a*|-add*)
         ]] && {
           command tag --add "$fargs[2]" "$fargs[3]" 2>/dev/null && {
-            +Ftag::msg -p "{brblue}Tag:{res} $fargs[2]"$'\t'"{brblue}Added:{res} $fargs[3]"
-          } || +Ftag::msg -p '{err}tag cannot be added'
+            +Ftag::msg "{brblue}Tag:{res} $fargs[2]"$'\t'"{brblue}Added:{res} $fargs[3]"
+          } || +Ftag::msg '{err}tag cannot be added'
         }
         ;;
       (-l|--list)
@@ -189,12 +197,15 @@ function Ftag::tag() {
           setopt extendedglob warncreateglobal noksharrays noshortloops nokshglob
           local -a tcnts ttags
           if [[ $#fargs -eq 1 && $fargs[1] = -(u|-usage) ]] {
+            # tag -u
             tcnts=( ${${(@f)"$(tag --usage)"}//(#m)*/${${(s: :)${MATCH}//[[:space:]]##/ }[1]}} )
             ttags=( ${${(@f)"$(tag --usage)"}//(#m)*/${${(s: :)${MATCH}//[[:space:]]##/ }[2]}} )
           } elif [[ $#fargs -eq 2 && $fargs[1] = -(u|-usage) && $~fargs[2] = (#s)(\~|\/|.##)*/#* ]] {
+            # tag -u ~/dir
             tcnts=( ${${(@f)"$(tag --usage ${(z)~fargs[2]})"}//(#m)*/${${(s: :)${MATCH}//[[:space:]]##/ }[1]}} )
             ttags=( ${${(@f)"$(tag --usage ${(z)~fargs[2]})"}//(#m)*/${${(s: :)${MATCH}//[[:space:]]##/ }[2]}} )
           } elif [[ $#fargs -eq 3 && $fargs[1] = -(u|-usage) && $~fargs[3] = (#s)(\~|\/|.##)*/#* ]] {
+            # tag -u <tag> ~/dir
             [[ $fargs[2] = [[:ascii:]]## ]] && {
               tcnts=( ${${(@f)"$(tag --usage ${(z)~fargs[3]})"}//(#m)*/${${(s: :)${MATCH}//[[:space:]]##/ }[1]}} )
               ttags=( ${${(@f)"$(tag --usage ${(z)~fargs[3]})"}//(#m)*/${${(s: :)${MATCH}//[[:space:]]##/ }[2]}} )
@@ -203,10 +214,12 @@ function Ftag::tag() {
                 # Normal tag does not do this; selecting one tag in a directory
                 tcnts=${(@)${tcnts[${ttags[(rI)$exists]}]}}
                 Ftag::color-tag "$exists"
-                +Ftag::msg -p "{brgreen}$tcnts{res} $REPLY"
+                +Ftag::msg "{brgreen}$tcnts{res} $REPLY"
                 return 0
-              } || { +Ftag::msg -p "{err}{cyan}$fargs[2]{res} is not an existing tag"; return 1; }
+              } || { +Ftag::msg "{err}{cyan}$fargs[2]{res} is not an existing tag"; return 1; }
             }
+          } else {
+              +Ftag::msg "{err}{cyan}$fargs{res} is an incorrect usage of {yell}--usage{res}"; return 1;
           }
           # SEE: if can fallthrough
           local -a packs unpacked;    integer i longest=0 adjust;     local t
@@ -224,7 +237,7 @@ function Ftag::tag() {
         ;;
       (-h|--help)
         # tag -h
-        +Ftag::msg -p "{bgreen}External tag help:{res}" \
+        +Ftag::msg "{bgreen}External tag help:{res}" \
           $'\n'"${${${(@)$(command tag --help)}//(#m)(${(~j:|:)__FTAG_EXTERNAL_OPTS})/${FTAG[yell]}${MATCH}${FTAG[res]}}//(#m)(-##[[:alnum:]]##)/${FTAG[green]}${MATCH}${FTAG[res]}}"
         ;;
       (*-[[:alpha:]]#g[[:alpha:]]#*|*--garrulous*)
@@ -237,30 +250,32 @@ function Ftag::tag() {
               ( $#fst_fargs -eq 2 && $fst_fargs[1] = (g|l) && $fst_fargs[2] = (g|l) ) )
           ]] {
             # Only passing -g implies -l
+            # tag -g | tag -
             tmp=( ${${${(@)${(@f)"$(tag -Al)"}/(#m)([[:space:]]|(#e))/---${MATCH}}//[[:space:]]/}//(#m)---(#e)/--- } )
             tags=( ${(@)${tmp[@]//(#m)*/${${(As:---:)MATCH}[2]}}} )
             files=( ${(@)${tmp[@]//(#m)*/${${(As:---:)MATCH}[1]}}} )
           } elif [[ $#fargs -eq 2 && ( ( $#fst_fargs -eq 2 && $fargs = *f* ) ||
-                    $#fst_fargs -eq 3 && $fargs = *f* && $#fargs = *t* ) && $fargs[-1] = (\*|[[:alnum:]]##)
+                    $#fst_fargs -eq 3 && $fargs = *f* && $fargs = *t* ) && $fargs[-1] = (\*|[[:alnum:]]##)
           ]] {
             # Same behavior for tag -gf '*' and tag -gtf '*'
             fargs[1]=${fargs[1]/t/}
-            targs=( "-Ntf" "${fargs[-1]}" )
+            targs=( "-ANtf" "${fargs[-1]}" )
           } elif [[ $#fargs -eq 3 && ( ( $#fst_fargs -eq 2 && $fargs = *f* ) ||
                     $#fst_fargs -eq 3 && $fargs = *f* && $fargs = *t* ) && $fargs[-1] = (#s)(\~|\/|.##)*/#*
           ]] {
             # Same behavior for tag -gf '<tag>' <dir> and tag -gtf '<tag>' <dir>
             fargs[1]=${fargs[1]/t/}
-            targs=( "-Ntf" "${fargs[-2]}" "${fargs[-1]}" )
+            targs=( "-ANtf" "${fargs[-2]}" "${fargs[-1]}" )
           } elif [[ $#fargs -eq 2 && $#fst_fargs -eq 2 && $fargs = *m* ]] {
-            targs=( "-Ntf" "${fargs[-1]}" "." )
+            targs=( "-ANtf" "${fargs[-1]}" "." )
           } else {
-            +Ftag::msg -p "{err}only the following tags are supported with garrulous mode:" \
+            +Ftag::msg "{err}only the following tags are supported with garrulous mode:" \
                 $'\n'"-{yell}g{res}, -{yell}gl{res}" \
                 $'\n'"-{yell}gf{res} '{green}<tag>{res}' {green}<dir>{res}, -{yell}gtf {green}<tag> <dir>{res}"$'\t'"(same output)" \
                 $'\n'"-{yell}gf{res} '{green}<tag>{res}', -{yell}gtf {green}<tag>{res}"$'\t'"(same output, global search)" \
                 $'\n'"-{yell}gm{res} '{green}<tag>{res}'"$'\t'"(local search)" \
-            exit 1
+            # FIX: two exits required to actually exit
+            exit; exit
           }
         # Can't use (( )) if tags in unset. Tried [[ ! -v tags ]]
         if [[ $#tags -eq 0 ]] {
@@ -275,7 +290,7 @@ function Ftag::tag() {
           setopt extendedglob warncreateglobal noksharrays noshortloops nokshglob
           local -a fst_fargs=( ${(s::)${fargs[1]#-}} )
           if [[ $#fargs -eq 1 ]] {
-            +Ftag::msg -p "{err}you must supply a tag"
+            +Ftag::msg "{err}you must supply a tag"
             exit 1
           } elif [[ $#fargs -eq 2 && $#fst_fargs -eq 1 && $fst_fargs = m ]] {
             local -a files=( ${(@f)"$(tag ${(z)fargs})"} )
@@ -284,16 +299,16 @@ function Ftag::tag() {
           } elif [[ $#fargs -eq 2 && $#fst_fargs -eq 2 && $fst_fargs[1] = t && $fst_fargs[2] = m ]] {
             # Normal tag requires -m and -f to be last flag since these flags require an argument
             # So, only check for -tm order here
-            targs=( "-Ntm" "$fargs[-1]" )
-            fargs=( "-Tm"  "$fargs[-1]" )
+            targs=( "-ANtm" "$fargs[-1]" )
+            fargs=( "-ATm"  "$fargs[-1]" )
           } elif [[ $#fargs -eq 3 && $#fst_fargs = <2-3> && ( $fst_fargs[1] = t || $fst_fargs[2] = t ) &&
                 ( $fst_fargs[2] = m || $fst_fargs[3] = m )
           ]] {
           # If tag -tm is given a dir along with a path, -e is required to enter directory
           # Here, (( -etm || -tem ) || -tm ) <tag> <dir> will be treated the same
           # Do not quote $~
-            targs=( -Netm $fargs[-2] $~fargs[-1] )
-            fargs=( -em  $fargs[-2] $~fargs[-1] )
+            targs=( -ANetm $fargs[-2] $~fargs[-1] )
+            fargs=( -Aem  $fargs[-2] $~fargs[-1] )
           }
         tags=( ${(@f)"$(tag ${(z)targs})"} )
         files=( ${(@f)"$(tag ${(z)fargs})"} )
@@ -301,32 +316,32 @@ function Ftag::tag() {
         ;;
       (*-[[:alpha:]]#f[[:alpha:]]#*|*--find*)
         # tag -tf '*'
-        targs+=( "-Ntf" )
+        targs+=( "-ANtf" )
         if [[ $#fargs -eq 3 && $~fargs[-1] = (#s)(\~|\/|.##)*/#* ]]; then
           targs+=( "${fargs[-2]}" "${fargs[-1]}" )
         elif [[ $#fargs -eq 2 && $fargs[-1] = (\*|[[:alnum:]]##) ]]; then
           targs+=( "${fargs[-1]}" )
         else
-          +Ftag::msg -p "{err}incorrect tag or path"
+          +Ftag::msg "{err}incorrect tag or path"
           return 1
         fi
         tags=( ${(@f)"$(tag ${(z)targs})"} )
         files=( ${(@f)"$(tag ${(z)fargs})"} )
         ;;
       (*)
-        +Ftag::msg -p "{err}flag is not supported"
+        +Ftag::msg "{err}flag: ${fargs} is not supported"
         return 1
       ;;
     esac
   } || {
     # FZF specific
-    if [[ $#fargs -eq 1 && $fargs[1] = -l ]]; then
+    if [[ $#fargs -eq 1 && $fargs[1] = -Al ]]; then
       tmp=( ${${${(@)${(@f)"$(tag -Al)"}/(#m)([[:space:]]|(#e))/---${MATCH}}//[[:space:]]/}//(#m)---(#e)/--- } )
       tags=( ${(@)${tmp[@]//(#m)*/${${(As:---:)MATCH}[2]}}} )
       files=( ${(@)${tmp[@]//(#m)*/${${(As:---:)MATCH}[1]}}} )
     else
-      (( ${+fargs[(r)-*f*]} )) && targs+=( "-Ntf" )
-      if [[ $#fargs -eq 3 && $fargs[-1] = (*/*|\.) ]]; then
+      (( ${+fargs[(r)-*f*]} )) && targs+=( "-ANtf" )
+      if [[ $#fargs -eq 3 && $fargs[-1] = (#s)(\~|\/|.##)*/#* ]]; then
         targs+=( "${fargs[-2]}" "${fargs[-1]}" )
       elif [[ $#fargs -eq 2 && $fargs[-1] = (\*|[[:alnum:]]##) ]]; then
         targs+=( "${fargs[-1]}" )
@@ -349,7 +364,7 @@ function Ftag::tag() {
   elif [[ "${sort#-s}" = (++|d|desc) ]]; then
     packs=( "${(On)packs[@]}" )
   else
-    +Ftag::msg -p "{warn}use 'd|desc|++' for descending; 'a|asc|+' for ascending"
+    +Ftag::msg "{warn}use 'd|desc|++' for descending; 'a|asc|+' for ascending"
     exit 1 # Doesn't exit here
   fi
   }
@@ -366,11 +381,11 @@ function Ftag::tag() {
     # builtin print -n "${(r:longest+1:: :)${(j:/:)reply[@]}} $REPLY"
     (( NO_COLOR )) && {
       (( GARRULOUS )) && {
-      builtin print -n "${unpacked[1]}"$'\n\t'"$unpacked[2]"
+      builtin print -n "${unpacked[1]}"$'\n'"   $unpacked[2]"
       } || builtin print -n "${(r:longest+1:: :)unpacked[1]} $unpacked[2]"
     } || {
       (( GARRULOUS )) && {
-      builtin print -n "${SHORT}"$'\n\t'"$REPLY"
+      builtin print -n "${SHORT}"$'\n'"   $REPLY"
       } || builtin print -n "${(r:longest+1:: :)SHORT} $REPLY"
     }
     builtin print
@@ -378,10 +393,10 @@ function Ftag::tag() {
 
   case $VERBOSE in
     ( <1-> )
-      +Ftag::msg -p "{brred}${(l:COLUMNS::=:):-}{res}" \
+      +Ftag::msg "{brred}${(l:COLUMNS::=:):-}{res}" \
           "{bgreen}Command:{res} tag -${action} ${fargs[2]:-} ${fargs[3]:-}" ;|
     ( <2-> )
-      +Ftag::msg -p "{brblue}${(l:COLUMNS::=:):-}{res}" \
+      +Ftag::msg "{brblue}${(l:COLUMNS::=:):-}{res}" \
          "{bgreen}Length:{res} $#fargs" ;|
     ( <3-> )
       # Call this here as well as usage above so it's only called when needed
@@ -389,11 +404,11 @@ function Ftag::tag() {
         builtin emulate -LR zsh -o extendedglob
         local -a gtags=( ${${(@f)"$(tag --usage)"}//(#m)*/${${(s: :)${MATCH}//[[:space:]]##/ }[2]}} )
         local -a ltags=( ${(@u)${(@s:,:)${(@f)"$(tag -Nl)"}}} )
-        +Ftag::msg -p "{brblue}${(l:COLUMNS::=:):-}{res}" \
+        +Ftag::msg "{brblue}${(l:COLUMNS::=:):-}{res}" \
             "{bgreen}Global tags:{res}"
         # Using res does not color all tags
         print -c -- ${FTAG[bold]}${(n)gtags}
-        +Ftag::msg -p "{res}{brblue}${(l:COLUMNS::=:):-}{res}" \
+        +Ftag::msg "{res}{brblue}${(l:COLUMNS::=:):-}{res}" \
             "{bgreen}Local tags:{res}"
         print -c -- ${FTAG[bold]}${(n)ltags}
       }
@@ -408,6 +423,13 @@ function OS::notify() {
   Ftag::dep "terminal-notifier" && {
       terminal-notifier -title "${2:-Ftag}" -message "${1:-.}"
   } || osascript -e 'display notification "'"$*"'"'
+}
+# ]]]
+
+# FUNCTION: Ftag::zstyle [[[
+# Wrapper function for zstyle
+function Ftag::zstyle() {
+  builtin zstyle $1 :ftag: ${@:2}
 }
 # ]]]
 
@@ -451,7 +473,7 @@ function Ftag::parallel() {
 function @Ftag::sched() {
   zmodload -Fa zsh/sched b:sched
   local AFD
-  # sched +0 'Ftag::tag "${wrapper#-W}"'
+  # sched +0 'Ftag::tag "${wrapper}"'
   sched +1 'Ftag::tag "${(z)tag_arguments}"'
   # sched +1 'echo "hi"'
 
@@ -530,7 +552,7 @@ function Ftag::cleanup() {
 # FUNCTION: Ftag::zoxide [[[
 # Switch or query directory with zoxide
 function Ftag::zoxide() {
-  _ZO_FZF_OPTS="$FZF_DEFAULT_OPTS --prompt ' Zoxide Tag> ' --no-height" zoxide query -i
+  _ZO_FZF_OPTS="$FZF_DEFAULT_OPTS --prompt ' Zoxide Tag> ' --no-height +m" zoxide query -i
 }
 # ]]]
 
@@ -541,7 +563,7 @@ function Ftag::autojump() {
   # Prevent the use of external programs as much as possible
   # autojump -s | tac | awk 'NR>7{print $2}' | fzf --prompt ' Jump Tag> ' --no-height
   builtin print -rl -- ${(Oa)${${(@f)"$(autojump -s)"}//(#m)*/${${(s: :)${MATCH}//[[:space:]]##/ }[2]}}[0,-6]} \
-    | fzf --prompt ' Jump Tag> ' --no-height
+    | fzf --prompt ' Jump Tag> ' --no-height +m
 }
 # ]]]
 
@@ -549,7 +571,7 @@ function Ftag::autojump() {
 # Enter in custom path to switch directories
 # TODO: create a prompt to switch paths
 function Ftag::path::find() {
-  builtin print | fzf --prompt ' Custom Path> ' --no-height --print-query
+  builtin print | fzf --prompt ' Custom Path> ' --no-height --print-query +m
 }
 # ]]]
 
@@ -560,6 +582,25 @@ function Ftag::gitui() {
   if Ftag::dep "lazygit"; then lazygit -p "${(z)@}"
   elif Ftag::dep "tig"; then tig -C "${(z)@}"
   fi
+}
+# ]]]
+
+# FUNCTION: Ftag::dirstack [[[
+# Use fzf to display dirstack and switch directories
+function Ftag::dirstack() {
+  builtin emulate -L zsh -o extendedglob
+  zmodload -Fa zsh/parameter p:dirstack
+  zle || {
+    if [[ -f ${ZDOTDIR:-$HOME/}/.zshrc ]] {
+      builtin source ${ZDOTDIR:-$HOME}/.zshrc
+    } elif [[ -f ${HOME}/.config/.zshrc ]] {
+      builtin source ${HOME}/.config/.zshrc
+    } else {
+      +Ftag::msg "{err}unsure where {brgreen}.zshrc{res} is located. Unable to use {yell}dirstack{res}"
+    }
+  }
+
+  builtin print -rl $dirstack | fzf --no-height --prompt ' Dirstack> ' +m
 }
 # ]]]
 
@@ -589,25 +630,92 @@ function Ftag::wutag() {
 # TODO: add options to fzf
 function Ftag::RG() {
   emulate -LR zsh -o extendedglob
-  local RG_PREFIX INITIAL_QUERY
+  local RG_PREFIX INITIAL_QUERY header
   local -a selected opts
   # zpty -e RG FZF_DEFAULT_COMMAND="$RG_PREFIX '$INITIAL_QUERY' || true"
+  header="C-e → $EDITOR | C-y → Copy | Esc/Q → Quit"
   RG_PREFIX="rg --column --hidden --line-number --no-heading --color=always --smart-case "
   INITIAL_QUERY="${*:-}"
   (
     selected=("$(
       FZF_DEFAULT_COMMAND="$RG_PREFIX '$INITIAL_QUERY' || true" \
         fzf --bind "change:reload:$RG_PREFIX {q} || true" \
-          --ansi --disabled --query "$INITIAL_QUERY" \
+          --ansi \
+          --disabled \
+          --header="$header" \
+          --query "$INITIAL_QUERY" \
           --delimiter : \
           --bind 'ctrl-e:execute($EDITOR "$(echo {} | cut -d: -f1)" >/dev/tty </dev/tty)' \
           --bind='ctrl-y:execute-silent(echo {+} | cut -d: -f1 | pbcopy)' \
+          --bind='esc:abort,Q:abort' \
           --preview 'bat --style=numbers,header,changes,snip --color=always --highlight-line {2} {1}' \
           --preview-window 'default:right:60%:~1:+{2}+3/2:border-left'
     )")
     selected=( ${(@s.:.)selected} )
     [[ -n "${selected[1]}" ]] && ${EDITOR} "${selected[1]}" "+${selected[2]}"
   )
+}
+# ]]]
+
+# FUNCTION: Ftag::copy::file [[[
+function Ftag::copy::file() {
+  builtin emulate -L zsh
+  setopt extendedglob typesetsilent noshortloops
+  local dest cmd ccmd
+  local -a cmds=(cp mv rsync rclone backup)
+  cmd=$(builtin print -rl $cmds | fzf --no-height +m)
+  ccmd=${cmd/(#m)[[:ascii:]]/${(U)MATCH}} # title-case
+
+  [[ -e $1 ]] || { OS::notify "Selection doesn't exist"; exit 1; }
+
+  [[ $cmd != (rclone|backup) ]] && {
+    if Ftag::dep "zoxide"; then
+      dest=$( _ZO_FZF_OPTS="$FZF_DEFAULT_OPTS --prompt ' $ccmd File> ' --no-height" zoxide query -i)
+    elif Ftag::dep "autojump"; then
+      dest=$(builtin print -rl -- ${(Oa)${${(@f)"$(autojump -s)"}//(#m)*/${${(s: :)${MATCH}//[[:space:]]##/ }[2]}}[0,-6]} \
+        | fzf --prompt " $ccmd File> " --no-height)
+    else
+      vared -cp "Enter path to $ccmd $1: " dest
+    fi
+  }
+
+  case $cmd in
+    (cp)
+      /bin/cp -pri ${(z)1} ${~dest} && OS::notify "$1 was copied to ${~dest}" ;;
+    (mv)
+      command mv -i ${(z)1} ${~dest} && OS::notify "$1 was moved to ${~dest}" ;;
+    (rsync)
+      Ftag::dep "rsync" && command rsync -aX ${(z)1} ${~dest} && \
+        OS::notify "$1 was rsynced to ${~dest}" || {
+          +Ftag::msg "{err}{yell}rsync{res} is not installed"; exit 1
+        }
+      ;;
+    (rclone)
+      local remote remote_path
+      vared -cp "Enter remote name: " remote
+      vared -cp "Enter remote path: " remote_path
+      Ftag::dep "rclone" || { +Ftag::msg "{err}{yell}rclone{res} is not installed"; exit 1; }
+      command rclone copy \
+      --update \
+      --delete-after \
+      --exclude ".DS_Store" \
+      --exclude .git/ \
+      --copy-links \
+      --transfers 4 \
+      --checkers 8 \
+      --contimeout 60s \
+      --timeout 300s \
+      --retries 3 \
+      --low-level-retries 10 \
+      ${(z)1} "${remote}:${remote_path}/" && \
+        OS::notify "$1 was rcloned to ${remote}:${remote_path}"
+        ;;
+    (backup)
+      # if Ftag::dep "gcp"; then
+      #   command gcp -r --force --suffix=.bak ${(z)1} $1.bak
+        /bin/cp -pri ${(z)1} $1.bak && OS::notify "$1 was backed up"
+      ;;
+  esac
 }
 # ]]]
 
@@ -683,6 +791,20 @@ function Ftag::dua() {
 }
 # ]]]
 
+# FUNCTION: Ftag::dust [[[
+# View directory/file size in dust or diskus
+function Ftag::dust() {
+  builtin emulate -LR zsh
+  if Ftag::dep "dust"; then
+    dust -d 1 "$@" | ${(z)FTAG_PAGER}
+  elif Ftag::dep "diskus"; then
+    diskus "$@" | ${(z)FTAG_PAGER}
+  else
+    return 1
+  fi
+}
+# ]]]
+
 # FUNCTION: Ftag::forgit [[[
 # Open directory if git and use forgit
 function Ftag::forgit() {
@@ -704,30 +826,30 @@ function Ftag::forgit() {
     rebase_i         "forgit::rebase"
     fixup            "forgit::fixup"
   )
-  Ftag::dep "dotbare" || return 1
   Ftag::is_git "$@" &>/dev/null || local git="no"
   if [[ $git != "no" ]]; then
     local reply wfxr
-    wfxr=${(f)$(whence -va forgit::log)}
-
-    # If used as a function and not autoloaded
-    if [[ -f "$wfxr" ]]; then
-      builtin source "$wfxr"
-    elif [[ -f ${ZDOTDIR:-$HOME}/.zinit/plugins//wfxr---forgit/forgit.plugin.zsh ]]; then
-      builtin source "${ZDOTDIR:-$HOME}/.zinit/plugins//wfxr---forgit/forgit.plugin.zsh"
-    elif [[ -f ${ZDOTDIR:-$HOME}/.zplugin/plugins//wfxr---forgit/forgit.plugin.zsh ]]; then
-      builtin source "${ZDOTDIR:-$HOME}/.zplugin/plugins//wfxr---forgit/forgit.plugin.zsh"
-    elif [[ -f ${ZDOTDIR:-$HOME}/zinit/plugins//wfxr---forgit/forgit.plugin.zsh ]]; then
-      builtin source "${ZDOTDIR:-$HOME}/zinit/plugins//wfxr---forgit/forgit.plugin.zsh"
-    elif [[ -f ${ZDOTDIR:-$HOME}/.ohmyzsh/custom/plugins/wfxr-forgit/forgit.plugin.zsh ]]; then
-      builtin source "${ZDOTDIR:-$HOME}/.ohmyzsh/custom/plugins/wfxr-forgit/forgit.plugin.zsh"
-    elif [[ -f ${ZDOTDIR:-$HOME}/ohmyzsh/custom/plugins/wfxr-forgit/forgit.plugin.zsh ]]; then
-      builtin source "${ZDOTDIR:-$HOME}/ohmyzsh/custom/plugins/wfxr-forgit/forgit.plugin.zsh"
-    elif [[ -z $ZDOTDIR && -f $HOME/.zshrc ]]; then
-      builtin source $HOME/.zshrc
-    elif [[ -f ${ZDOTDIR:-$HOME/.config/zsh}/.zshrc ]]; then
-      builtin source ${ZDOTDIR:-$HOME/.config/zsh}/.zshrc
-    fi
+    zle && {
+      wfxr=${(f)$(whence -va forgit::log)}
+      [[ -f "$wfxr" ]] && builtin source "$wfxr"
+    } || {
+      # If used as a function and not autoloaded
+      if [[ -f ${ZDOTDIR:-$HOME}/.zinit/plugins//wfxr---forgit/forgit.plugin.zsh ]]; then
+        builtin source "${ZDOTDIR:-$HOME}/.zinit/plugins//wfxr---forgit/forgit.plugin.zsh"
+      elif [[ -f ${ZDOTDIR:-$HOME}/.zplugin/plugins//wfxr---forgit/forgit.plugin.zsh ]]; then
+        builtin source "${ZDOTDIR:-$HOME}/.zplugin/plugins//wfxr---forgit/forgit.plugin.zsh"
+      elif [[ -f ${ZDOTDIR:-$HOME}/zinit/plugins//wfxr---forgit/forgit.plugin.zsh ]]; then
+        builtin source "${ZDOTDIR:-$HOME}/zinit/plugins//wfxr---forgit/forgit.plugin.zsh"
+      elif [[ -f ${ZDOTDIR:-$HOME}/.ohmyzsh/custom/plugins/wfxr-forgit/forgit.plugin.zsh ]]; then
+        builtin source "${ZDOTDIR:-$HOME}/.ohmyzsh/custom/plugins/wfxr-forgit/forgit.plugin.zsh"
+      elif [[ -f ${ZDOTDIR:-$HOME}/ohmyzsh/custom/plugins/wfxr-forgit/forgit.plugin.zsh ]]; then
+        builtin source "${ZDOTDIR:-$HOME}/ohmyzsh/custom/plugins/wfxr-forgit/forgit.plugin.zsh"
+      elif [[ -z $ZDOTDIR && -f $HOME/.zshrc ]]; then
+        builtin source $HOME/.zshrc
+      elif [[ -f ${ZDOTDIR:-$HOME/.config/zsh}/.zshrc ]]; then
+        builtin source ${ZDOTDIR:-$HOME/.config/zsh}/.zshrc
+      fi
+      }
 
     reply=$(print -rl "${(@k)forgit_cmds}" | fzf --no-height)
     [[ -n "$reply" ]] && {
@@ -800,14 +922,14 @@ function Ftag::default_header() {
 # Format header display from CLI
 function Ftag::boxes() {
   (( ${+commands[boxes]} )) && boxes -d tex-box || {
-    cat; +Ftag::msg -p "{warn}{green}boxes{res} is required to use this feature{res}"
+    cat; +Ftag::msg "{warn}{green}boxes{res} is required to use this feature{res}"
   }
 }
 # ]]]
 # FUNCTION: Ftag::lolcat [[[
 function Ftag::lolcat() {
   (( ${+commands[lolcat]} )) && lolcat || {
-    cat; +Ftag::msg -p "{warn}{green}lolcat{res} is required to use this feature{res}"
+    cat; +Ftag::msg "{warn}{green}lolcat{res} is required to use this feature{res}"
   }
 }
 # ]]]
@@ -818,7 +940,7 @@ function Ftag::toilet() {
   (( ${+commands[toilet]} )) && {
     toilet -d "${prog_dir}/../fonts" -f ansi_shadow --gay "${(j. .)@}"
   } || {
-    cat; +Ftag::msg -p "{warn}{green}toilet{res} is required to use this feature{res}"
+    cat; +Ftag::msg "{warn}{green}toilet{res} is required to use this feature{res}"
   }
 }
 # ]]]
@@ -883,88 +1005,9 @@ function Ftag::vared-format() {
     print -rl -- ${(l:max+adjusted+7+1+5+4:)${(r:max+adjusted+7+1:)tags[@]}}
 
   done
-  # print -rl -- ${(l:max+adjusted+7+1+5:)${(r:max+adjusted+7+1:)formatted[@]}}
 }
 # ]]]
 # ]]] == END: Formatting and Display
-
-# ARRAYS: Bindings [[[
-local -a __FTAG_EXTERNAL_OPTS
-__FTAG_EXTERNAL_OPTS=(
-    wutag zoxide autojump lolcat toilet boxes tag fzf glow lazygit gitui gpg
-    dua twf dotbare forgit rg bat ftag less pbcopy ctrl alt lf ranger xplr exa
-    dragon
-)
-
-local -A __FTAG_OPTS
-__FTAG_OPTS=(
-    "-w, --wutag"         "Also tag files with wutag (-ww only uses wutag)"
-    "-q, --query <query>" "Start fzf with a query"
-    "-p, --path"          "Enter a path for ftag to start"
-    "-z, --zoxide"        "Use zoxide to select directory to use tags (only shows tagged files)"
-    "-j, --autojump"      "Use autojump to select directory to use tags (only shows tagged files)"
-    "-b, --boxes"         "Add a box around header with boxes"
-    "-c, --lolcat"        "Color the header with lolcat"
-    "-t, --toilet"        "Color and format the header with toilet"
-    "-l, --local"         "Use tag in a local directory"
-    "-n, --nocolor"       "Don't use colored output"
-    "-s, --sort"          "Sort desc with d|desc|++, sort ascending with a|asc|+"
-    "-N, --nofzf"         "No fzf, however not a wrapper"
-    "-W, --wrapper"       "No fzf, but is a wrapper and can use tag commands"
-    "-f, --cfont"         "Use custom font with figlet (some are provided)"
-    "-h, --help"          "Display this help message"
-    "-v, --verbose"       "Display verbosity (-vvv is max; only used with wrapper as of now)"
-)
-
-local -A __FTAG_KEYBINDINGS
-__FTAG_KEYBINDINGS=(
-    A   "Add/append tags -- ACTION_ADD"
-    S   "Set tags (overwrites) -- ACTION_SET"
-    D   "Delete/remove tags -- ACTION_REMOVE"
-    R   "Reload the tag search -- ACTION_RELOAD"
-    U   "Show tag usage -- ACTION_USAGE"
-    E   "Edit selected tags with \$EDITOR -- ACTION_EDIT"
-    F   "Open directory with file manager in which tagged file resides -- ACTION_FILEMANAGER"
-    C-w "Open directory with glow if dir contains markdown files -- ACTION_GLOW"
-    I   "Open gitui/lazygit if directory is a git-dir -- ACTION_GIT"
-    C-p "Switch to custom path -- ACTION_PATH"
-    L   "Switch to local mode (i.e., current directory) -- ACTION_LOCAL"
-    G   "Switch to global mode (i.e., default mode/all tags on filesystem) -- ACTION_GLOBAL"
-    Z   "Switch to zoxide query to select path to list tags -- ACTION_ZOXIDE"
-    J   "Switch to autojump query to select path to list tags -- ACTION_AUTOJUMP"
-    C-p "Open a popup window to copy file with dragon -- ACTION_DRAGON_SOURCE"
-    C-e "Edit a gpg-encrypted file -- ACTION_GPG_EDIT"
-    C-g "Encrypt or decrypt a file with gpg. If encryped, decrypted and vice versa -- ACTION_GPG"
-    C-d "Open directory in dua interactive mode -- ACTION_DUA"
-    C-t "Open directory in twf to edit file -- ACTION_TWF_EDIT"
-    C-r "Open directory with rg in an interactive mode -- ACTION_RIPGREP"
-    C-f "If git-dir, open forgit to select action -- ACTION_FORGIT"
-    C-b "If git-dir, open dotbare to select action -- ACTION_DOTBARE"
-    C-o "Open directory in finder -- ACTION_FINDER"
-    O   "Open file in external program based on extension -- ACTION_OPEN"
-    M-d "Be propted to delete file -- ACTION_DELETE"
-    P   "Toggle preview of file or directory -- ACTION_PREVIEW"
-    V   "Toggle bat to view file -- ACTION_VIEW"
-    C-v "Toggle a TUI program to view file -- ACTION_EXTERNALVIEW"
-    C-y "Copy file or directory name -- ACTION_COPY"
-    Q   "Quit ftag -- ACTION_QUIT"
-    "?" "Show key help message -- ACTION_HELP"
-)
-
-typeset -gAH __FTAG_ENVIRONVARS
-__FTAG_ENVIRONVARS=(
-    FTAG_PAGER                               'Pager to view file or usage (default: bat, less)'
-    FTAG_COPY                                'Copy command to copy path to clipboard (default: pbcopy)'
-    FTAG_MODIFIER                            'Modifier to bind with fzf (default: ctrl)'
-    FTAG_ALT                                 'Alternative key bind with fzf (default: alt)'
-    FTAG_FILEMANAGER                         'File manager to open in ftag (default: lf, ranger, xplr)'
-    FTAG_FILE_PREV                           'Fzf preview for files (default: bat)'
-    FTAG_DIR_PREV                            'Fzf preview for directories (default: exa)'
-    FTAG_KEYFILE                             'File of keybinding configuration (-g|--genconfig will generate an example $XDG_CONFIG_HOME/ftag/config)'
-    FTAG_DIR_MAP                             'File of directory mappings for the %shortening'
-    "zstyle ':ftag:*' key-file <location>"   'Another way to specify configuration (this has higher priority)'
-)
-# ]]]
 
 # FUNCTION: Ftag::usage [[[
 # Display typical help message
@@ -972,13 +1015,13 @@ function Ftag::usage() {
   emulate -LR zsh
   builtin setopt extendedglob noshortloops noksharrays rcquotes
   Ftag::default_header -s "ftag" -c 13
-  +Ftag::msg -p "{bred}USAGE:{res}"
-  +Ftag::msg -p $'\t'"{brcyan}ftag{res} {brmagen}[wsh]{res} {green}<tag>{res}" \
+  +Ftag::msg "{bred}USAGE:{res}"
+  +Ftag::msg $'\t'"{brcyan}ftag{res} {brmagen}[wsh]{res} {green}<tag>{res}" \
                 $'\n\t'"{green}ftag{res} is an FZF TUI for jdberry's {green}tag{res} on macOS" \
                 $'\n\t'"It uses {yell}figlet{res} by default to display headers, though it is not needed" \
                 $'\n\t'"{green}<tag>{res} is an optional argument, and if used it must be exact. There" \
                 $'\n\t'"are zsh completions to help complete tags. For a fuzzy search, use the {green}--q{res} flag"
-  +Ftag::msg -p "{bred}FLAGS:{res}"
+  +Ftag::msg "{bred}FLAGS:{res}"
 
   # Fix these to be one command
   local THEFD
@@ -999,10 +1042,11 @@ function Ftag::usage() {
     exec {THEFD}<&-
   }
 
-  +Ftag::msg -p $'\t'"The above flags can be used in any combination. Figlet is ran if toilet isn't" \
-                $'\n\t'"specified and vice-versa. Figlet cannot be specified explicitly. The default" \
-                $'\n\t'"printing (no flags specified and figlet installed) looks the nicest."
-  +Ftag::msg -p "{bred}INSIDE FZF:{res}"
+  +Ftag::msg $'\t'"If a tag is searched for (optional argument), it must be last. Figlet is ran if" \
+             $'\n\t'"toilet isn't specified and vice-versa. The default printing (no flags specified" \
+             $'\n\t'" and figlet installed) looks the nicest. Parameters requiring arguments can be used" \
+             $'\n\t'"with an equals sign (e.g., --path=)"
+  +Ftag::msg "{bred}INSIDE FZF:{res}"
   Ftag::parallel "Ftag::show_keys"
 }
 # ]]]
@@ -1013,7 +1057,7 @@ function Ftag::show_keys() {
   emulate -LR zsh
   builtin setopt extendedglob noshortloops noksharrays rcquotes
   integer longest=0
-  local k v; for v (${(@ok)__FTAG_KEYBINDINGS}) { (( $#v > $longest )) && longest=$#v; }
+  local k; for k (${(@ok)__FTAG_KEYBINDINGS}) { (( $#k > $longest )) && longest=$#k; }
   adjusted=$(( ${#FTAG[res]} +  ${#FTAG[green]} ))
   for k in ${(@ok)__FTAG_KEYBINDINGS}; do
     print -r -- $'\t'${(r:longest+adjusted+4:)${k:+${FTAG[green]}${k}${FTAG[res]}}} \
@@ -1028,7 +1072,7 @@ function Ftag::show_keys() {
 function Ftag::env_vars() {
   emulate -LR zsh
   builtin setopt extendedglob noshortloops noksharrays rcquotes
-  +Ftag::msg -p "{bred}ENVIRONMENT VARIABLES:{res}"
+  +Ftag::msg "{bred}ENVIRONMENT VARIABLES:{res}"
   integer longest=0
   local k v; for v (${(@ok)__FTAG_ENVIRONVARS}) { (( $#v > $longest )) && longest=$#v; }
   adjusted=$(( ${#FTAG[res]} + ${#FTAG[green]} ))
@@ -1040,12 +1084,98 @@ function Ftag::env_vars() {
 # ]]]
 # ]]] == END: Functions: Formatting and Display
 
+# ARRAYS: Bindings [[[
+local -a __FTAG_EXTERNAL_OPTS
+__FTAG_EXTERNAL_OPTS=(
+    wutag zoxide autojump lolcat toilet boxes tag fzf glow lazygit gitui gpg
+    dua twf dotbare forgit rg bat ftag less pbcopy ctrl alt lf ranger xplr exa
+    dragon dust
+)
+
+local -A __FTAG_OPTS
+__FTAG_OPTS=(
+    "-w, --wutag"          "Also tag files with wutag (-ww only uses wutag)"
+    "-q, --query <query>"  "Start fzf with a query"
+    "-p, --path <path>"    "Enter a path for ftag to start"
+    "-z, --zoxide"         "Use zoxide to select directory to use tags (only shows tagged files)"
+    "-j, --autojump"       "Use autojump to select directory to use tags (only shows tagged files)"
+    "-b, --boxes"          "Add a box around header with boxes"
+    "-c, --lolcat"         "Color the header with lolcat"
+    "-t, --toilet"         "Color and format the header with toilet"
+    "-l, --local"          "Use tag in a local directory"
+    "-n, --nocolor"        "Don't use colored output"
+    "-s, --sort"           "Sort desc with d|desc|++, sort ascending with a|asc|+"
+    "-N, --nofzf"          "No fzf, however not a wrapper"
+    "-W, --wrapper <cmds>" "No fzf, but is a wrapper and can use tag commands"
+    "-f, --cfont <font>"   "Use custom font with figlet (some are provided)"
+    "-h, --help"           "Display this help message"
+    "-v, --verbose"        "Display verbosity (-vvv is max; only used with wrapper as of now)"
+)
+
+local -A __FTAG_KEYBINDINGS
+__FTAG_KEYBINDINGS=(
+    A   "Add/append tags -- ACTION_ADD"
+    D   "Delete/remove tags -- ACTION_REMOVE"
+    E   "Edit selected tags with \$EDITOR -- ACTION_EDIT"
+    F   "Open directory with file manager in which tagged file resides -- ACTION_FILEMANAGER"
+    G   "Switch to global mode (i.e., default mode/all tags on filesystem) -- ACTION_GLOBAL"
+    I   "Open gitui/lazygit if directory is a git-dir -- ACTION_GIT"
+    J   "Switch to autojump query to select path to list tags -- ACTION_AUTOJUMP"
+    L   "Switch to local mode (i.e., current directory) -- ACTION_LOCAL"
+    O   "Open file in external program based on extension -- ACTION_OPEN"
+    P   "Toggle preview of file or directory -- ACTION_PREVIEW"
+    Q   "Quit ftag -- ACTION_QUIT"
+    R   "Reload the tag search -- ACTION_RELOAD"
+    S   "Set tags (overwrites) -- ACTION_SET"
+    U   "Show tag usage -- ACTION_USAGE"
+    V   "Toggle bat to view file -- ACTION_VIEW"
+    Z   "Switch to zoxide query to select path to list tags -- ACTION_ZOXIDE"
+    C-b "If git-dir, open dotbare to select action -- ACTION_DOTBARE"
+    C-d "Open directory in dua interactive mode -- ACTION_DUA"
+    C-e "Edit a gpg-encrypted file -- ACTION_GPG_EDIT"
+    C-f "If git-dir, open forgit to select action -- ACTION_FORGIT"
+    C-g "Encrypt or decrypt a file with gpg. If encryped, decrypted and vice versa -- ACTION_GPG"
+    C-o "Open directory in finder -- ACTION_FINDER"
+    C-p "Switch to custom path -- ACTION_PATH"
+    C-r "Open directory with rg in an interactive mode -- ACTION_RIPGREP"
+    C-s "Switch directories using dirstack -- ACTION_DIRSTACK"
+    C-t "Open directory in twf to edit file -- ACTION_TWF_EDIT"
+    C-v "Toggle a TUI program to view file -- ACTION_EXTERNALVIEW"
+    C-w "Open directory with glow if dir contains markdown files -- ACTION_GLOW"
+    C-y "Copy file or directory name -- ACTION_COPY"
+    M-c "Copy/move/rsync/backup file or directory -- ACTION_COPY_FILE"
+    M-d "Be propted to delete file -- ACTION_DELETE"
+    M-p "Open a popup window to copy file with dragon -- ACTION_DRAGON_SOURCE"
+    M-s "View directory size in dust -- ACTION_DUST"
+    "?" "Show key help message -- ACTION_HELP"
+)
+
+typeset -gAH __FTAG_ENVIRONVARS
+__FTAG_ENVIRONVARS=(
+    FTAG_PAGER                                      'Pager to view file or usage (default: bat, less)'
+    FTAG_COPY                                       'Copy command to copy path to clipboard (default: pbcopy)'
+    FTAG_MODIFIER                                   'Modifier to bind with fzf (default: ctrl)'
+    FTAG_ALT                                        'Alternative key bind with fzf (default: alt)'
+    FTAG_FILEMANAGER                                'File manager to open in ftag (default: lf, ranger, xplr)'
+    FTAG_FILE_PREV                                  'Fzf preview for files (default: bat)'
+    FTAG_DIR_PREV                                   'Fzf preview for directories (default: exa)'
+    FTAG_KEYFILE                                    'File of keybinding configuration (-g|--genconfig will generate an example $XDG_CONFIG_HOME/ftag/config)'
+    FTAG_DIR_MAP                                    'File of directory mappings for the %shortening'
+    "zstyle ':ftag:' key-file <location>"           'Another way to specify configuration (this has higher priority)'
+    "zstyle ':ftag:' fzf-command fzf_command <cmd>" 'Alternate fzf command (e.g., fzf-tmux)'
+    "zstyle ':ftag:' fzf-bindings bind <bindings>"  'List of additional fzf bindings (not actions), e.g., alt-shift-up:preview-up'
+    "zstyle ':ftag:' fzf-flags <flags>"             'Additional fzf flags to main command'
+    "zstyle ':ftag:' fzf-file-preview <prev_cmd>"   'Alternative way to specify FTAG_FILE_PREV'
+    "zstyle ':ftag:' fzf-dir-preview <prev_cmd>"    'Alternative way to specify FTAG_DIR_PREV'
+)
+# ]]]
+
 # SECTION: == Imports / Setting Variables == [[[
 zmodload -Fa zsh/zutil b:zparseopts \
-  || +Ftag::msg -p "{err}{green}zsh/zutil{res} is required to use this program{res}"
+  || +Ftag::msg "{err}{green}zsh/zutil{res} is required to use this program{res}"
 # ${commands[@]} array
 zmodload -Fa zsh/parameter p:commands p:parameters \
-  || +Ftag::msg -p "{err}{green}zsh/parameter{res} is requred to use this program{res}"
+  || +Ftag::msg "{err}{green}zsh/parameter{res} is requred to use this program{res}"
 # tput $COLUMNS
 zmodload zsh/terminfo 2>/dev/null
 zmodload zsh/termcap 2>/dev/null
@@ -1053,12 +1183,12 @@ zmodload zsh/termcap 2>/dev/null
 # a all = not used
 # Set query as optional args to prevent errors
 local -A opts
-local -a cfont sort wtag query verbose
+local -a cfont sort wtag query verbose optpath
 typeset -gaH wrapper
 zparseopts -D -A opts h -help b -boxes c -lolcat t -toilet g -genconfig \
     l -local z -zoxide j -jump n -nocolor N -nofzf {W,-wrapper}:=wrapper \
-    {f,-font}::=cfont {p,-path}:=opts {q,-query}::=query \
-    {w,-wutag}+=wtag {s,-sort}::=sort {v,-verbose}+=verbose
+    {f,-font}::=cfont {p,-path}:=optpath {q,-query}::=query \
+    {w,-wutag}+=wtag {s,-sort}::=sort {v,-verbose}+=verbose || { Ftag::usage; return 1; }
 
 # colors=(); fg=(); bg=(); fg_bold=(); bg_bold=(); reset_color=""
 typeset -gAH FTAG
@@ -1073,6 +1203,10 @@ FTAG=(
   res    $'\e[0m'
 )
 
+# TODO: add usage
+# local -A colors fg bg fg_bold bg_bold
+# autoload colors
+# colors
 typeset -gAH __FTAG_ANSI
 __FTAG_ANSI=(
   red   "$fg_no_bold[red]"     bred   "$fg_bold[red]"     bgred   "$bg[red]"
@@ -1083,35 +1217,14 @@ __FTAG_ANSI=(
   cyan  "$fg_no_bold[cyan]"    bcyan  "$fg_bold[cyan]"    bgcyan  "$bg[cyan]"
 )
 
-Ftag::declare -A '\
-  FTAG_DIR_MAP=(
-    "$HOME/.config/zsh"     %ZDOTDIR
-    "$HOME/.config"         %XDG_CONFIG_HOME
-    "$HOME/.cache"          %XDG_CACHE_HOME
-    "$HOME/.local/share"    %XDG_DATA_HOME
-    "$HOME/bin"             %XDG_BIN_HOME
-    "$HOME/ghq"             %GHQ
-    "$HOME/github"          %GITHUB
-    "$HOME/projects/github" %GITHUB
-    "$HOME/Downloads"       %DOWNLOADS
-    "$HOME/Documents"       %DOCUMENTS
-    "$HOME/Desktop"         %DESKTOP
-    "$HOME/Pictures"        %PICTURES
-    "$HOME/Library"         %LIBRARY
-    "$HOME/Applications"    %APPLICATIONS
-    "$HOME/Music"           %MUSIC
-    "$HOME/Movies"          %MOVIES
-    "$HOME/vimwiki"         %WIKI_DIR
-    "$HOME"                 %HOME
-  )'
-
 # Has to be global when program is sourced on second loop
 typeset -gH FZFTAG_QUERY
-FZFTAG_QUERY=${${(v)opts[(I)(-q|--query)]}:-}  # fzf query
+FZFTAG_QUERY=${${${query##-(q|-query(=|))}[-1]}:-} # fzf query
 export FZFTAG_QUERY
 
 typeset -gH FZFTAG_PATH
-FZFTAG_PATH=${${(v)opts[(I)(-p|--path)]}:-}  # search path
+# This array is split instead of above, where it's joined
+FZFTAG_PATH=${${${(@)optpath##-(p|-path(=|))}[-1]//=/}:-} # fzf path
 export FZFTAG_PATH
 
 typeset -g +h LESS
@@ -1137,6 +1250,28 @@ Ftag::declare "FTAG_FILEMANAGER=${commands[lf]:-${commands[ranger]}:-${commands[
 Ftag::declare "FTAG_MODIFIER=ctrl"
 Ftag::declare "FTAG_ALT=alt"
 Ftag::declare "FTAG_COPY=pbcopy"
+
+Ftag::declare -A '\
+  FTAG_DIR_MAP=(
+    "$HOME/.config/zsh"     %ZDOTDIR
+    "$HOME/.config"         %XDG_CONFIG_HOME
+    "$HOME/.cache"          %XDG_CACHE_HOME
+    "$HOME/.local/share"    %XDG_DATA_HOME
+    "$HOME/bin"             %XDG_BIN_HOME
+    "$HOME/ghq"             %GHQ
+    "$HOME/github"          %GITHUB
+    "$HOME/projects/github" %GITHUB
+    "$HOME/Downloads"       %DOWNLOADS
+    "$HOME/Documents"       %DOCUMENTS
+    "$HOME/Desktop"         %DESKTOP
+    "$HOME/Pictures"        %PICTURES
+    "$HOME/Library"         %LIBRARY
+    "$HOME/Applications"    %APPLICATIONS
+    "$HOME/Music"           %MUSIC
+    "$HOME/Movies"          %MOVIES
+    "$HOME/vimwiki"         %WIKI_DIR
+    "$HOME"                 %HOME
+  )'
 
 readonly TTY_REDIRECTION="< /dev/tty > /dev/tty 2>&1"
 readonly FTAG_PRINT="+print-query"
@@ -1164,6 +1299,7 @@ typeset -gA FTAG_ACTIONS
 : ${FTAG_ACTIONS[ACTION_GPG_EDIT]:=execute(env FZFTAG_ACTION=gpg-edit "$prog" \{+f\} "${(z)TTY_REDIRECTION}")"${(z)FTAG_PRINT}"}
 : ${FTAG_ACTIONS[ACTION_GPG]:=execute(env FZFTAG_ACTION=gpg "$prog" \{+f\} "${(z)TTY_REDIRECTION}")"${(z)FTAG_PRINT}"}
 : ${FTAG_ACTIONS[ACTION_DUA]:=execute(env FZFTAG_ACTION=dua "$prog" \{+f\} "${(z)TTY_REDIRECTION}")"${(z)FTAG_PRINT}"}
+: ${FTAG_ACTIONS[ACTION_DUST]:=execute(env FZFTAG_ACTION=dust "$prog" \{+f\} "${(z)TTY_REDIRECTION}")"${(z)FTAG_PRINT}"}
 : ${FTAG_ACTIONS[ACTION_TWF_EDIT]:=execute(env FZFTAG_ACTION=twf-edit "$prog" \{+f\} "${(z)TTY_REDIRECTION}")"${(z)FTAG_PRINT}"}
 : ${FTAG_ACTIONS[ACTION_RIPGREP]:=execute(env FZFTAG_ACTION=ripgrep "$prog" \{+f\} "${(z)TTY_REDIRECTION}")"${(z)FTAG_PRINT}"}
 : ${FTAG_ACTIONS[ACTION_FORGIT]:=execute(env FZFTAG_ACTION=forgit "$prog" \{+f\} "${(z)TTY_REDIRECTION}")"${(z)FTAG_PRINT}"}
@@ -1171,6 +1307,7 @@ typeset -gA FTAG_ACTIONS
 : ${FTAG_ACTIONS[ACTION_GLOW]:=execute(env FZFTAG_ACTION=glow "$prog" \{+f\} "${(z)TTY_REDIRECTION}")"${(z)FTAG_PRINT}"}
 : ${FTAG_ACTIONS[ACTION_DRAGON_SOURCE]:=execute(env FZFTAG_ACTION=dragon-source "$prog" \{+f\} "${(z)TTY_REDIRECTION}")"${(z)FTAG_PRINT}"}
 
+: ${FTAG_ACTIONS[ACTION_COPY_FILE]:=execute(env FZFTAG_ACTION=copy-file "$prog" \{+f\} "${(z)TTY_REDIRECTION}")"${(z)FTAG_PRINT}"}
 : ${FTAG_ACTIONS[ACTION_FINDER]:=execute(env FZFTAG_ACTION=open-finder "$prog" \{+f\} "${(z)TTY_REDIRECTION}")"${(z)FTAG_PRINT}"}
 : ${FTAG_ACTIONS[ACTION_OPEN]:=execute(env FZFTAG_ACTION=open "$prog" \{+f\} "${(z)TTY_REDIRECTION}")"${(z)FTAG_PRINT}"}
 : ${FTAG_ACTIONS[ACTION_VIEW]:=execute(env FZFTAG_ACTION=bat-view "$prog" \{+f\})}
@@ -1178,6 +1315,7 @@ typeset -gA FTAG_ACTIONS
 : ${FTAG_ACTIONS[ACTION_COPY]:=execute-silent(env FZFTAG_ACTION=copy "$prog" \{+f\})}
 : ${FTAG_ACTIONS[ACTION_DELETE]:=execute(env FZFTAG_ACTION=delete "$prog" \{+f\} "${(z)TTY_REDIRECTION}")"${(z)FTAG_PRINT}"}
 
+: ${FTAG_ACTIONS[ACTION_DIRSTACK]:=execute(env FZFTAG_STATE_CHANGE=dirstack "$prog" )"${(z)FTAG_INTERNAL}${FTAG_CHPROMPT}"( Dirstack Tag> )}
 : ${FTAG_ACTIONS[ACTION_LOCAL]:=execute(env FZFTAG_STATE_CHANGE=local "$prog" )"${(z)FTAG_INTERNAL}${FTAG_CHPROMPT}"( Local Tag> )}
 : ${FTAG_ACTIONS[ACTION_PATH]:=execute(env FZFTAG_STATE_CHANGE=path "$prog" )"${(z)FTAG_INTERNAL}${FTAG_CHPROMPT}"( Path Tag> )}
 : ${FTAG_ACTIONS[ACTION_GLOBAL]:=execute(env FZFTAG_STATE_CHANGE=global "$prog" )"${(z)FTAG_INTERNAL}${FTAG_CHPROMPT}"( Global Tag> )}
@@ -1190,13 +1328,10 @@ typeset -gA FTAG_ACTIONS
 : ${FTAG_ACTIONS[ACTION_QUIT]:=abort}
 
 : ${FTAG_ACTIONS[ACTION_TEST]:=execute(env FZFTAG_ACTION=test "$prog" \{+f\} "${(z)TTY_REDIRECTION}")"${(z)FTAG_PRINT}"}
-
-# TODO: use or remove
 : ${FTAG_ACTIONS[ACTION_TWF_SWITCH]:=execute(env FZFTAG_STATE_CHANGE=twf-switch "$prog" )"${(z)FTAG_RELOAD}${FTAG_CHPROMPT}"(TWF Tag>)}
 
-# TODO: create page explaining fzf executes to allow these
-
-zstyle :plugin:ftag bindings default
+# TODO: create page explaining fzf executes to allow these; use default bindings
+# builtin zstyle ":ftag:*" bindings default
 typeset -gA FTAG_KEYBINDINGS
 : ${FTAG_KEYBINDINGS[A]:=$FTAG_ACTIONS[ACTION_ADD]}
 : ${FTAG_KEYBINDINGS[S]:=$FTAG_ACTIONS[ACTION_SET]}
@@ -1206,16 +1341,19 @@ typeset -gA FTAG_KEYBINDINGS
 : ${FTAG_KEYBINDINGS[T]:=$FTAG_ACTIONS[ACTION_TEST]}
 : ${FTAG_KEYBINDINGS[F]:=$FTAG_ACTIONS[ACTION_FILEMANAGER]}
 : ${FTAG_KEYBINDINGS[I]:=$FTAG_ACTIONS[ACTION_GIT]}
+: ${FTAG_KEYBINDINGS[${FTAG_MODIFIER}-s]:=$FTAG_ACTIONS[ACTION_DIRSTACK]}
 : ${FTAG_KEYBINDINGS[${FTAG_MODIFIER}-b]:=$FTAG_ACTIONS[ACTION_DOTBARE]}
 : ${FTAG_KEYBINDINGS[${FTAG_MODIFIER}-f]:=$FTAG_ACTIONS[ACTION_FORGIT]}
 : ${FTAG_KEYBINDINGS[${FTAG_MODIFIER}-e]:=$FTAG_ACTIONS[ACTION_GPG_EDIT]}
 : ${FTAG_KEYBINDINGS[${FTAG_MODIFIER}-g]:=$FTAG_ACTIONS[ACTION_GPG]}
+: ${FTAG_KEYBINDINGS[${FTAG_ALT}-c]:=$FTAG_ACTIONS[ACTION_COPY_FILE]}
 : ${FTAG_KEYBINDINGS[${FTAG_MODIFIER}-d]:=$FTAG_ACTIONS[ACTION_DUA]}
+: ${FTAG_KEYBINDINGS[${FTAG_ALT}-s]:=$FTAG_ACTIONS[ACTION_DUST]}
 : ${FTAG_KEYBINDINGS[${FTAG_MODIFIER}-t]:=$FTAG_ACTIONS[ACTION_TWF_EDIT]}
 : ${FTAG_KEYBINDINGS[${FTAG_MODIFIER}-r]:=$FTAG_ACTIONS[ACTION_RIPGREP]}
 : ${FTAG_KEYBINDINGS[${FTAG_MODIFIER}-o]:=$FTAG_ACTIONS[ACTION_FINDER]}
 : ${FTAG_KEYBINDINGS[${FTAG_MODIFIER}-w]:=$FTAG_ACTIONS[ACTION_GLOW]}
-: ${FTAG_KEYBINDINGS[${FTAG_MODIFIER}-p]:=$FTAG_ACTIONS[ACTION_DRAGON_SOURCE]}
+: ${FTAG_KEYBINDINGS[${FTAG_ALT}-p]:=$FTAG_ACTIONS[ACTION_DRAGON_SOURCE]}
 : ${FTAG_KEYBINDINGS[O]:=$FTAG_ACTIONS[ACTION_OPEN]}
 : ${FTAG_KEYBINDINGS[${FTAG_ALT}-d]:=$FTAG_ACTIONS[ACTION_DELETE]}
 : ${FTAG_KEYBINDINGS[${FTAG_MODIFIER}-p]:=$FTAG_ACTIONS[ACTION_PATH]}
@@ -1232,7 +1370,7 @@ typeset -gA FTAG_KEYBINDINGS
 : ${FTAG_KEYBINDINGS[esc]:=$FTAG_ACTIONS[ACTION_QUIT]}
 : ${FTAG_KEYBINDINGS[?]:=$FTAG_ACTIONS[ACTION_HELP]}
 
-: ${FTAG_KEYBINDINGS[${FTAG_MODIFIER}-s]:=$FTAG_ACTIONS[ACTION_TWF_SWITCH]}
+# : ${FTAG_KEYBINDINGS[${FTAG_MODIFIER}-s]:=$FTAG_ACTIONS[ACTION_TWF_SWITCH]}
 
 # Adding everything to main array
 local -a tmp
@@ -1245,53 +1383,81 @@ for j (${tmp[@]})                  { FTAG[map__${${(s:=:)j}[1]}]=${${(s:=:)j}[2]
 # TODO: USE ONE ARRAY FOR KEYBINDINGS ^^
 
 typeset -gHA __ftag_config
+# print -- ${${jobstates[(R)running:*]/#*:/}/%=*/}
 
 () {
   builtin emulate -LR zsh
-  setopt nullglob noksharrays extendedglob
+  setopt nullglob noksharrays extendedglob typesetsilent warncreateglobal
   zmodload -Fa zsh/files b:zf_mkdir
+  zmodload -Fa zsh/zutil b:zstyle
   local -a tmp
-  local cf kf keyfile="${XDG_CONFIG_HOME:-$HOME/.config}/ftag/config"
-  local lastcache_file="${TMPDIR:-/tmp}/ftag_lastcache"
-  [[ -f $lastcache_file ]] && __ftag_config[lastcache]="$(<$lastcache_file)" || __ftag_config[lastcache]=0
+  local kf keyfile fprev dprev bind
+  typeset -gH fzf_command ftag_binds fzf_flags
+
+  keyfile="${XDG_CONFIG_HOME:-$HOME/.config}/ftag/config"
+  ftag_binds="alt-shift-down:preview-down,alt-shift-up:preview-up"
+
+  # local cf
+  # local lastcache_file="${TMPDIR:-/tmp}/ftag_lastcache"
+  # [[ -f $lastcache_file ]] && __ftag_config[lastcache]="$(<$lastcache_file)" || __ftag_config[lastcache]=0
+
+  # Idea taken from aloxaf/fzf-tab
+  Ftag::zstyle -s fzf-command fzf_command || fzf_command=fzf
+  Ftag::zstyle -a fzf-bindings bind && ftag_binds+=,${(j:,:)bind}
+  Ftag::zstyle -a fzf-flags fzf_flags
+  Ftag::zstyle -s fzf-file-preview fprev && FTAG_FILE_PREV=$fprev
+  Ftag::zstyle -s fzf-dir-preview dprev && FTAG_DIR_PREV=$dprev
 
   # $0 here is (anon)
-  zstyle -s ":ftag:*" key-file ${kf::=__ftag_config[keyfile]} || {
+  Ftag::zstyle -s key-file ${kf::=__ftag_config[keyfile]} || {
     ! Ftag::declare "FTAG_KEYFILE=$keyfile" && __ftag_config[keyfile]=$FTAG_KEYFILE || {
       __ftag_config[keyfile]="${0:A:h}/ftag"
     }
   }
 
   [[ $~__ftag_config[keyfile] != "${0:A:h}/ftag" && -f $~__ftag_config[keyfile] ]] && {
-    builtin source $~__ftag_config[keyfile] || +Ftag::msg -p "{err}could not source $~__ftag_config[keyfile]"
-  } # || { ... KEYBINDINGS HERE ... }
+    local -a kf_cont
+    local f mark
+    kf_cont=( ${(@f)"$(<$__ftag_config[keyfile])"} )
+    for f ($kf_cont) {
+      [[ $f = FTAG_ACTIONS* ]] && { mark=1; continue }
+      [[ $f = [^\']* ]] && continue
+      FTAG_KEYBINDINGS[${${${(s:' ':)f}[1]}//\'/}]=${(qq)${${${(s:' ':)f}[2]}//\'/}}
+      if (( mark = 1 )) {
+        FTAG_ACTIONS[${${${(s:' ':)f}[1]}//\'/}]=${(qq)${${${(s:' ':)f}[2]}//\'/}}
+      }
+    }
+    # builtin source $~__ftag_config[keyfile] || +Ftag::msg "{err}could not source $~__ftag_config[keyfile]"
+  }
 
   Ftag::opts "g genconfig" && {
     local ans
-    [[ ! -d $keyfile:h ]] && { zf_mkdir -p $~keyfile:h || +Ftag::msg -p "{err}could not create ftag configuration directory"; exit 1; }
+    [[ ! -d $keyfile:h ]] && { zf_mkdir -p $~keyfile:h || +Ftag::msg "{err}could not create ftag configuration directory"; exit 1; }
     [[ -f $keyfile ]] && vared -cp "Configuration already exists. Generate another? [Y/n] >> " ans
-    [[ $ans = (#i)n ]] && { +Ftag::msg -p "{bryell}Configuration not generated{res}"; exit 0; }
+    [[ $ans != (#i)y(es|) ]] && { +Ftag::msg "{bryell}Configuration not generated{res}"; exit 0; }
 
-    integer long=0
-    for f (${(kv@qq)^^FTAG[(I)key__*]}) { (( $#f > $long )) && long=$#f }
-
-    # local tarr="${(@)${(kv@qq)^^FTAG[(I)key__*]}//key__/}" | perl -pe 's/\n/ / if $. % 2'
-
+    # builtin print -rl -- "${(@)${(kv@qq)^^FTAG[(I)key__*]}//key__/}" | perl -pe 's/\n/ / if $. % 2' >>! "${~keyfile}"
+    # builtin print -rl -- "${(@)${(kv@qq)^^FTAG[(I)action__*]}//action__/}" | perl -pe 's/\n/ / if $. % 2' >>! "${~keyfile}"
     builtin print -r "#!/usr/bin/env zsh" >! "${~keyfile}"
     builtin print -r "typeset -gA FTAG_KEYBINDINGS FTAG_ACTIONS" >>! "${~keyfile}"
     builtin print -r "FTAG_KEYBINDINGS=(" >>! "${~keyfile}"
-    builtin print -rl -- "${(@)${(kv@qq)^^FTAG[(I)key__*]}//key__/}" | perl -pe 's/\n/ / if $. % 2' >>! "${~keyfile}"
+    builtin print -rl -- "${(kv@qq)^^FTAG_KEYBINDINGS}" | perl -pe 's/\n/ / if $. % 2' >>! "${~keyfile}"
     builtin print -r ")" >>! "${~keyfile}"
 
     builtin print >>! "${~keyfile}"
 
-    # TODO: add back ACTION__ when reading
     builtin print -r "FTAG_ACTIONS=(" >>! "${~keyfile}"
-    builtin print -rl -- "${(@)${(kv@qq)^^FTAG[(I)action__*]}//action__/}" | perl -pe 's/\n/ / if $. % 2' >>! "${~keyfile}"
+    builtin print -rl -- "${(kv@qq)^^FTAG_ACTIONS}" | perl -pe 's/\n/ / if $. % 2' >>! "${~keyfile}"
     builtin print -r ")" >>! "${~keyfile}"
 
-    +Ftag::msg -p "{brgreen}Configuration generated:{res} {yell}\$XDG_CONFIG_HOME/ftag/config{res}"
+    +Ftag::msg "{brgreen}Configuration generated:{res} {yell}${~keyfile}{res}"
+    exit 0
   }
+
+  # local -a arr
+  # arr=(${(@f)"$(<$keyfile)"})
+  # print -rl $arr
+  # exit
 
   # zstyle -s ":ftag:*" cache-file ${cf::=__ftag_config[cachefile]} || {
   #   ! Ftag::declare "FTAG_CACHEFILE=${XDG_CONFIG_HOME:-$HOME/.config}/ftag/config" && __ftag_config[cachefile]=$FTAG_CACHEFILE || {
@@ -1311,8 +1477,6 @@ typeset -gHA __ftag_config
   # print -rl -- ${(kv@qq)^^FTAG[(I)(key|map|action)__*]}
 }
 
-exit
-
 # print -rl -- ${(kv)FTAG[(I)action__*]}
 
 # Actions used for fzf
@@ -1325,7 +1489,7 @@ __FTAG_ACTIONS=( ${(@)${(k)FTAG_KEYBINDINGS//(#m)*/\-\-bind=$MATCH:${FTAG_KEYBIN
 local current_filter
 current_filter=${XDG_RUNTIME_DIR:-${XDG_CACHE_DIR:-${TMP-/tmp}}}/tag-filter
 if ! command touch $current_filter; then
-  +Ftag::msg -p "{err}{brgreen}${prog}{res}: Can't create a marker file needed for internal state management.{res}"
+  +Ftag::msg "{err}{brgreen}${prog}{res}: Can't create a marker file needed for internal state management.{res}"
 fi
 # ]]] == END: Create Filter
 
@@ -1336,8 +1500,8 @@ if [[ "${_FZFTAG_SHOW}" = "keys" ]]; then
   local header
   local -a keys
   # Not sure how to put this in array as one element other than this, it reads as 3
-  header=$(+Ftag::msg -p "{brred}KEY"$'\t\t'"{brmagen}ACTION"$'\t\t\t\t'"{byell}FZFTAG_ACTION{res}")
-  line=$(+Ftag::msg -p "{brred}==="$'\t\t'"{brmagen}======"$'\t\t\t\t'"{bryell}============={res}")
+  header=$(+Ftag::msg "{brred}KEY"$'\t\t'"{brmagen}ACTION"$'\t\t\t\t'"{byell}FZFTAG_ACTION{res}")
+  line=$(+Ftag::msg "{brred}==="$'\t\t'"{brmagen}======"$'\t\t\t\t'"{bryell}============={res}")
   keys=( $header $line )
   keys+=( ${(@)${(f)"$(Ftag::show_keys)"}/$'\t'/} )
   print -rl -- $keys
@@ -1423,7 +1587,7 @@ if [[ -n "$FZFTAG_ACTION" ]]; then
       Ftag::parse_format "ripgrep search"
       vared -cp "Local search [Y/n]: " yesno
       vared -cp " Ripgrep keyword: " keyw
-      [[ "$yesno" == (#i)n ]] && {
+      [[ "$yesno" == (#i)n(o|) ]] && {
         () {
             setopt localoptions noautopushd
             builtin cd -q "${reply:h}"
@@ -1475,6 +1639,11 @@ if [[ -n "$FZFTAG_ACTION" ]]; then
       (( $#pathf > 1 )) && {
         OS::notify "Only one selection is permitted with dua"; return 1
       } || Ftag::dua "${reply:h}"
+      ;;
+    (dust)
+      (( $#pathf > 1 )) && {
+        OS::notify "Only one selection is permitted with dust"; return 1
+      } || Ftag::dust "${reply:h}"
       ;;
     (twf-edit)
       (( $#pathf > 1 )) && {
@@ -1568,7 +1737,7 @@ if [[ -n "$FZFTAG_ACTION" ]]; then
         (( $#array > 1)) && {
           vared -cp " Delete files ${array[@]:t3}? [Y/n] " yesno
         } || vared -cp " Delete file ${array:t3}? [Y/n] " yesno
-        [[ "$yesno" == (#i)y ]] && {
+        [[ "$yesno" == (#i)y(es|) ]] && {
           for f ($array) {
             case 1 in
               (${+commands[trash-put]}) trash-put "${f}" && OS::notify "put: ${f:t} deleted"; ret=$? ;;
@@ -1608,6 +1777,9 @@ if [[ -n "$FZFTAG_ACTION" ]]; then
         return $ret
       }
       ;;
+    (copy-file)
+      Ftag::copy::file "$reply"
+      ;;
   esac
   clear
   print -Pr -- "${FTAG[red]}${(l:COLUMNS::=:):-}${FTAG[res]}"
@@ -1624,30 +1796,34 @@ local dir_switch
 if [[ -n "$FZFTAG_STATE_CHANGE" ]]; then
   case "$FZFTAG_STATE_CHANGE" in
     local)
-      FZFTAG_CMD=( "-l" )
+      FZFTAG_CMD=( "-Al" )
       ;;
     global)
-      FZFTAG_CMD=( "-f" "*" )
+      FZFTAG_CMD=( "-Af" "*" )
+      ;;
+    dirstack)
+      dir_switch=$(Ftag::dirstack)
+      [[ -d ${~dir_switch} ]] || { OS::notify "Not a directory"; return 1 }
+      FZFTAG_CMD=( "-Af" "*" ${~dir_switch} )
       ;;
     path)
       dir_switch=$(Ftag::path::find)
       [[ -d ${~dir_switch} ]] || { OS::notify "Not a directory"; return 1 }
-      FZFTAG_CMD=( "-f" "*" ${~dir_switch} )
-      # osa "$FZFTAG_CMD"
+      FZFTAG_CMD=( "-Af" "*" ${~dir_switch} )
       ;;
     zoxide)
       dir_switch=$(Ftag::zoxide)
       [[ -d ${~dir_switch} ]] || { OS::notify "Not a directory"; return 1 }
-      FZFTAG_CMD=( "-f" "*" ${~dir_switch} )
+      FZFTAG_CMD=( "-Af" "*" ${~dir_switch} )
       ;;
     autojump)
       dir_switch=$(Ftag::autojump)
       [[ -d ${~dir_switch} ]] || { OS::notify "Not a directory"; return 1 }
-      FZFTAG_CMD=( "-f" "*" ${~dir_switch} )
+      FZFTAG_CMD=( "-Af" "*" ${~dir_switch} )
       ;;
   esac
 
-  print -Rn "$FZFTAG_CMD" > $current_filter
+  print -Rn "${FZFTAG_CMD[@]}" > $current_filter
   exit $?
 fi
 # ]]] == END: State Change
@@ -1701,12 +1877,12 @@ while (( $? != 130 )) {
         export FZFTAG_WTAG=1
       }
     else
-      +Ftag::msg -p "{warn}{green}wutag{res} is not in PATH" \
+      +Ftag::msg "{warn}{green}wutag{res} is not in PATH" \
         $'\n'"Install {green}wutag{res} or don't use {yell}-w{res},{yell}--wutag{res}"
     fi
   fi
 
-  (( ${+cfont} ))       && export FZFTAG_FONT="${opts[-f]}"
+  (( ${+cfont} ))       && export FZFTAG_FONT=${${cfont##-(f|-font(=|))}[-1]}
   Ftag::opts "b boxes"  && export FZFTAG_BOXES=1
   Ftag::opts "c lolcat" && export FZFTAG_LOLCAT=1
   Ftag::opts "t toilet" && export FZFTAG_TOILET=1
@@ -1719,20 +1895,20 @@ while (( $? != 130 )) {
   else
   # First time ran
     if Ftag::opts "l local"; then
-      tag_arguments=( "-l" )
+      tag_arguments=( "-Al" )
     elif Ftag::opts "p path"; then
-      tag_arguments=( "-f" "*" "$FZFTAG_PATH" )
+      tag_arguments=( "-Af" "*" "$FZFTAG_PATH" )
     elif Ftag::opts "z zoxide"; then
       Ftag::dep -e "zoxide"
       dir_switch=$(Ftag::zoxide)
-      tag_arguments=( "-f" "*" "$dir_switch" )
+      tag_arguments=( "-Af" "*" "$dir_switch" )
     elif Ftag::opts "j jump"; then
       Ftag::dep -e "autojump"
       dir_switch=$(Ftag::autojump)
-      tag_arguments=( "-f" "*" "$dir_switch" )
+      tag_arguments=( "-Af" "*" "$dir_switch" )
     else
       # Don't quote *
-      tag_arguments=( "-f" "${@:-*}" )
+      tag_arguments=( "-Af" "${@:-*}" )
     fi
     print -Rn "${tag_arguments[@]}" >! $current_filter
   fi
@@ -1769,28 +1945,33 @@ while (( $? != 130 )) {
 
   Ftag::opts "W wrapper" && {
     export WRAPPER=1
+    wrapper=${${wrapper##-(w|-wrapper(=|))}[-1]/=/}
     # Not sure if this speeds up at all
-    Ftag::parallel 'Ftag::tag "${wrapper#-W}"'
+    Ftag::parallel 'Ftag::tag "${wrapper}"'
+
     # zmodload -Fa zsh/zpty b:zpty && {
-    #   zpty "ftag" 'Ftag::tag "${wrapper#-W}"'
+    #   zpty "ftag" 'Ftag::tag "${wrapper}"'
     #   zpty -r "ftag"
     #   zpty -d "ftag"
-    # } || Ftag::tag "${wrapper#-W}"
+    # } || Ftag::tag "${wrapper}"
     return ret
   }
 
   Ftag::tag "${(z)tag_arguments}" \
-      | fzf \
+    | $fzf_command \
       ${${(z)${(j. .)FZFTAG_OPTS}}//\'} \
+      --bind=$ftag_binds \
       --ansi \
       --query "$FZFTAG_QUERY" \
       --multi \
+      --cycle \
       --info=inline \
       --pointer '➤' \
       --no-height \
       --preview-window=':hidden,right:60%' \
       --preview "env FZFTAG_PREV=1 $0 {+f}" \
-      "${__FTAG_ACTIONS[@]}"
+      "${__FTAG_ACTIONS[@]}" \
+      $fzf_flags
 }
 # ]]] == END: Main Loop
 

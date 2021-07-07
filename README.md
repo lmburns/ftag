@@ -2,27 +2,29 @@
 
 ### Usage
 
+Parameters requiring arguments can be used with an equals sign (e.g., `--path=`).
+
 ```sh
-USAGE:
-        ftag  [wsh] <tag>
-        ftag is an FZF TUI for jdberry's tag on macOS
-        It uses 'figlet' by default to display headers, though it is not needed
-        <tag> is optional argument, and if used, it must be exact. There
-        are zsh completions to complete tags. For a fuzzy search, use the -q flag
 FLAGS:
-        -b, --boxes             Add a box around header with boxes
-        -c, --lolcat            Color the header with lolcat
-        -h, --help              Display this help message
-        -n, --nocolor           Do not use colored output
-        -j, --autojump          Use autojump to select directory to use tags (only shows tagged files)
-        -l, --local             Use tag in a local directory
-        -q, --query <query>     Start fzf with a query
-        -t, --toilet            Color and format the header with toilet
-        -w, --wutag             Also tag files with wutag (-ww only uses wutag)
-        -z, --zoxide            Use zoxide to select directory to use tags (only shows tagged files)
-        The above flags can be used in any combination. Figlet is ran if toilet isn't
-        specified and vice-versa. Although figlet doesn't have a flag, it is ran by default.
-        The default printing (no flags specified and figlet installed) looks the nicest.
+        -N, --nofzf              No fzf, however not a wrapper
+        -W, --wrapper <cmds>     No fzf, but is a wrapper and can use tag commands
+        -b, --boxes              Add a box around header with boxes
+        -c, --lolcat             Color the header with lolcat
+        -f, --cfont <font>       Use custom font with figlet (some are provided)
+        -h, --help               Display this help message
+        -j, --autojump           Use autojump to select directory to use tags (only shows tagged files)
+        -l, --local              Use tag in a local directory
+        -n, --nocolor            Don't use colored output
+        -p, --path <path>        Enter a path for ftag to start
+        -q, --query <query>      Start fzf with a query
+        -s, --sort               Sort desc with d|desc|++, sort ascending with a|asc|+
+        -t, --toilet             Color and format the header with toilet
+        -v, --verbose            Display verbosity (-vvv is max; only used with wrapper as of now)
+        -w, --wutag              Also tag files with wutag (-ww only uses wutag)
+        -z, --zoxide             Use zoxide to select directory to use tags (only shows tagged files)
+        If a tag is searched for (optional argument), it must be last. Figlet is ran if
+        toilet isn't specified and vice-versa. The default printing (no flags specified
+         and figlet installed) looks the nicest.
 ```
 
 ### Keybindings within `ftag`
@@ -38,18 +40,22 @@ INSIDE FZF:
         C-o     Open directory in finder  ACTION_FINDER
         C-p     Switch to custom path  ACTION_PATH
         C-r     Open directory with rg in an interactive mode  ACTION_RIPGREP
+        C-s     Switch directories using dirstack  ACTION_DIRSTACK
         C-t     Open directory in twf to edit file  ACTION_TWF_EDIT
         C-v     Toggle a TUI program to view file  ACTION_EXTERNALVIEW
         C-w     Open directory with glow if dir contains markdown files  ACTION_GLOW
         C-y     Copy file or directory name  ACTION_COPY
         D       Delete/remove tags  ACTION_REMOVE
-        E       Edit selected tags with \$EDITOR  ACTION_EDIT
+        E       Edit selected tags with $EDITOR  ACTION_EDIT
         F       Open directory with file manager in which tagged file resides  ACTION_FILEMANAGER
         G       Switch to global mode (i.e., default mode/all tags on filesystem)  ACTION_GLOBAL
         I       Open gitui/lazygit if directory is a git-dir  ACTION_GIT
         J       Switch to autojump query to select path to list tags  ACTION_AUTOJUMP
         L       Switch to local mode (i.e., current directory)  ACTION_LOCAL
+        M-c     Copy/move/rsync/backup file or directory  ACTION_COPY_FILE
         M-d     Be propted to delete file  ACTION_DELETE
+        M-p     Open a popup window to copy file with dragon  ACTION_DRAGON_SOURCE
+        M-s     View directory size in dust  ACTION_DUST
         O       Open file in external program based on extension  ACTION_OPEN
         P       Toggle preview of file or directory  ACTION_PREVIEW
         Q       Quit ftag  ACTION_QUIT
@@ -79,9 +85,14 @@ The file-manager to open the directory in using `F` within `fzf`. The defaults a
 
 #### `FTAG_FILE_PREV`
 The command to preview files with using `fzf`. The default is `bat --style=numbers --color=always`.
+Alternative method to specify the preview is: `zstyle ":ftag:" fzf-file-preview <prev_cmd>`.
 
 #### `FTAG_DIR_PREV`
 The command to preview directories with using `fzf`. The default is `exa -TL 3`.
+Alternative method to specify the preview is: `zstyle ":ftag:" fzf-dir-preview <prev_cmd>`
+
+#### `FTAG_KEYFILE`
+File of keybinding configuration (`-g`|`--genconfig` will generate an example `$XDG_CONFIG_HOME/ftag/config`)
 
 #### `FTAG_DIR_MAP`
 An array containing maps to directories for `ftag` to shorten. There are already several that are set. An array can be set in the format of:
@@ -94,18 +105,58 @@ An array containing maps to directories for `ftag` to shorten. There are already
 "$HOME/bin"             %XDG_BIN_HOME
 ```
 
+### `zstyle`
+
+These are additional `zstyle` settings.
+
+#### Default `fzf` command
+
+`fzf-tmux` or whatever else `fzf` wrapper can be used instead of the default. `skim` compatibility is in the works.
+
+```sh
+zstyle ":ftag:" fzf-command <cmd>
+```
+
+#### Additional `fzf` bindings
+
+These are additional `fzf` bindings that are not actions. An example would be `ctrl-j:preview-down,ctrl-k:preview-up`.
+
+```sh
+zstyle ":ftag:" fzf-bindings <bindings>
+```
+
+#### Additional `fzf` flags
+
+The source code can be peeked at to see the ones already in use. This option is here in case any additional would like to be added.
+
+```sh
+zstyle ":ftag:" fzf-flags
+```
 
 ## Installation
 
-### Zinit
+### `zinit`
+
+#### As a binary
 
 ```sh
 zinit light-mode lucid null for \
     sbin"f*/ftag" lmburns/ftag
 
+zinit light-mode lucid binary for \
+    lbin"f*/ftag" lmburns/ftag
+```
+
+### As a plugin
+
+```sh
 # either or (can remove trigger-load as well)
 zinit light-mode lucid for \
     nocompile'!' trigger-load'!ftag' blockf compile'f*/*~*.zwc' \
+    lmburns/ftag
+
+zinit light-mode lucid for \
+    blockf compile'f*/*~*.zwc' \
     lmburns/ftag
 ```
 
