@@ -1063,7 +1063,7 @@ function Ftag::show_keys() {
     print -r -- $'\t'${(r:longest+adjusted+4:)${k:+${FTAG[green]}${k}${FTAG[res]}}} \
       ${${${__FTAG_KEYBINDINGS[$k]}//(#b)(${(~j:|:)__FTAG_EXTERNAL_OPTS})/${FTAG[yell]}${match}${FTAG[res]}}//-- (#m)ACTION_*/${FTAG[brcyan]}${MATCH##--}${FTAG[res]}}
   done
-  Ftag::parallel "Ftag::env_vars"
+  [[ $1 != -h ]] && Ftag::parallel "Ftag::env_vars"
 }
 # ]]]
 
@@ -1503,7 +1503,7 @@ if [[ "${_FZFTAG_SHOW}" = "keys" ]]; then
   header=$(+Ftag::msg "{brred}KEY"$'\t\t'"{brmagen}ACTION"$'\t\t\t\t'"{byell}FZFTAG_ACTION{res}")
   line=$(+Ftag::msg "{brred}==="$'\t\t'"{brmagen}======"$'\t\t\t\t'"{bryell}============={res}")
   keys=( $header $line )
-  keys+=( ${(@)${(f)"$(Ftag::show_keys)"}/$'\t'/} )
+  keys+=( ${(@)${(f)"$(Ftag::show_keys -h)"}/$'\t'/} )
   print -rl -- $keys
   exit 0
 fi
