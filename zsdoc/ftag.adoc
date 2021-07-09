@@ -14,17 +14,21 @@ FUNCTIONS
 ---------
 
  +Ftag::msg
+ @Ftag::sched
  Ftag::RG
  Ftag::autojump
  Ftag::boxes
  Ftag::cleanup
  Ftag::color-tag
  Ftag::copy
+ Ftag::copy::file
  Ftag::declare
  Ftag::default_header
  Ftag::dep
+ Ftag::dirstack
  Ftag::dotbare
  Ftag::dua
+ Ftag::dust
  Ftag::env_vars
  Ftag::forgit
  Ftag::format_length
@@ -35,8 +39,10 @@ FUNCTIONS
  Ftag::lolcat
  Ftag::map-back
  Ftag::map-short
+ Ftag::open::with
  Ftag::opts
  Ftag::parallel
+ Ftag::parallel2
  Ftag::parse_format
  Ftag::path::find
  Ftag::show_keys
@@ -47,6 +53,7 @@ FUNCTIONS
  Ftag::vared-format
  Ftag::wutag
  Ftag::zoxide
+ Ftag::zstyle
  OS::notify
 
 DETAILS
@@ -55,11 +62,16 @@ DETAILS
 Script Body
 ~~~~~~~~~~~
 
-Has 651 line(s). Calls functions:
+Has 807 line(s). Calls functions:
 
  Script-Body
  |-- +Ftag::msg
  |-- Ftag::RG
+ |-- Ftag::copy::file
+ |   |-- +Ftag::msg
+ |   |-- Ftag::dep
+ |   `-- OS::notify
+ |       `-- Ftag::dep
  |-- Ftag::declare
  |-- Ftag::default_header
  |-- Ftag::dep
@@ -68,8 +80,9 @@ Has 651 line(s). Calls functions:
  |   `-- Ftag::is_git
  |-- Ftag::dua
  |   `-- Ftag::dep
+ |-- Ftag::dust
+ |   `-- Ftag::dep
  |-- Ftag::forgit
- |   |-- Ftag::dep
  |   |-- Ftag::is_git
  |   `-- OS::notify
  |       `-- Ftag::dep
@@ -79,7 +92,17 @@ Has 651 line(s). Calls functions:
  |-- Ftag::gpg
  |-- Ftag::is_git
  |-- Ftag::map-back
+ |-- Ftag::open::with
+ |   `-- Ftag::parse_format
+ |       |-- Ftag::boxes
+ |       |   `-- +Ftag::msg
+ |       |-- Ftag::default_header
+ |       |-- Ftag::lolcat
+ |       |   `-- +Ftag::msg
+ |       `-- Ftag::toilet
+ |           `-- +Ftag::msg
  |-- Ftag::opts
+ |-- Ftag::parallel
  |-- Ftag::parse_format
  |   |-- Ftag::boxes
  |   |   `-- +Ftag::msg
@@ -96,33 +119,35 @@ Has 651 line(s). Calls functions:
  |-- Ftag::usage
  |   |-- +Ftag::msg
  |   |-- Ftag::default_header
- |   `-- Ftag::show_keys
- |       `-- Ftag::env_vars
- |           `-- +Ftag::msg
+ |   `-- Ftag::parallel
  |-- Ftag::wutag
+ |-- Ftag::zstyle
  `-- OS::notify
      `-- Ftag::dep
 
-Uses feature(s): _export_, _read_, _setopt_, _vared_, _zle_, _zmodload_, _zparseopts_
+Uses feature(s): _export_, _read_, _setopt_, _trap_, _vared_, _zmodload_, _zparseopts_
 
-_Exports (environment):_ FZFTAG_BOXES [big]*//* FZFTAG_FONT [big]*//* FZFTAG_LOLCAT [big]*//* FZFTAG_PATH [big]*//* FZFTAG_QUERY [big]*//* FZFTAG_TOILET [big]*//* FZFTAG_WTAG [big]*//* LESS
+_Exports (environment):_ FZFTAG_BOXES [big]*//* FZFTAG_FONT [big]*//* FZFTAG_LOLCAT [big]*//* FZFTAG_PATH [big]*//* FZFTAG_QUERY [big]*//* FZFTAG_TOILET [big]*//* FZFTAG_WTAG [big]*//* LESS [big]*//* WRAPPER
 
 +Ftag::msg
 ~~~~~~~~~~
 
 ____
- # SECTION: == Functions: Helper == [[[
- # FUNCTION: +Ftag::msg [[[
- # Map colors to FTAG array and recognize errors and warnings
+ 
+ SECTION: == Functions: Helper == [[[
+ FUNCTION: +Ftag::msg [[[
+ Map colors to FTAG array and recognize errors and warnings
 ____
 
-Has 17 line(s). Doesn't call other functions.
+Has 18 line(s). Doesn't call other functions.
 
 Uses feature(s): _setopt_
 
 Called by:
 
  Ftag::boxes
+ Ftag::copy::file
+ Ftag::dirstack
  Ftag::env_vars
  Ftag::lolcat
  Ftag::tag
@@ -130,17 +155,32 @@ Called by:
  Ftag::usage
  Script-Body
 
+@Ftag::sched
+~~~~~~~~~~~~
+
+____
+ 
+ FUNCTION: @Ftag::sched [[[
+____
+
+Has 9 line(s). Doesn't call other functions.
+
+Uses feature(s): _sched_, _zle_, _zmodload_
+
+Not called by script or any function (may be e.g. a hook, a Zle widget, etc.).
+
 Ftag::RG
 ~~~~~~~~
 
 ____
- # FUNCTION: Ftag::RG [[[
- # Open directory and interactively search with ripgrep
- # Default action is to open in editor
- # TODO: add options to fzf
+ 
+ FUNCTION: Ftag::RG [[[
+ Open directory and interactively search with ripgrep
+ Default action is to open in editor
+ TODO: add options to fzf
 ____
 
-Has 19 line(s). Doesn't call other functions.
+Has 24 line(s). Doesn't call other functions.
 
 Called by:
 
@@ -150,8 +190,9 @@ Ftag::autojump
 ~~~~~~~~~~~~~~
 
 ____
- # FUNCTION: Ftag::autojump [[[
- # Switch or query directory with autojump
+ 
+ FUNCTION: Ftag::autojump [[[
+ Switch or query directory with autojump
 ____
 
 Has 3 line(s). Doesn't call other functions.
@@ -162,8 +203,9 @@ Ftag::boxes
 ~~~~~~~~~~~
 
 ____
- # FUNCTION: Ftag::boxes [[[
- # Format header display from CLI
+ 
+ FUNCTION: Ftag::boxes [[[
+ Format header display from CLI
 ____
 
 Has 3 line(s). Calls functions:
@@ -179,8 +221,9 @@ Ftag::cleanup
 ~~~~~~~~~~~~~
 
 ____
- # FUNCTION: Ftag::cleanup [[[
- # TODO: look into named pipes
+ 
+ FUNCTION: Ftag::cleanup [[[
+ TODO: look into named pipes
 ____
 
 Has 2 line(s). Doesn't call other functions.
@@ -191,8 +234,9 @@ Ftag::color-tag
 ~~~~~~~~~~~~~~~
 
 ____
- # FUNCTION: Ftag::color-tag [[[
- # $1 - Tag to color
+ 
+ FUNCTION: Ftag::color-tag [[[
+ $1 - Tag to color
 ____
 
 Has 4 line(s). Doesn't call other functions.
@@ -207,9 +251,10 @@ Ftag::copy
 ~~~~~~~~~~
 
 ____
- # FUNCTION: Ftag::copy [[[
- # Determine copy command
- # TODO: use this or no?
+ 
+ FUNCTION: Ftag::copy [[[
+ Determine copy command
+ TODO: use this or no?
 ____
 
 Has 4 line(s). Calls functions:
@@ -219,12 +264,35 @@ Has 4 line(s). Calls functions:
 
 Not called by script or any function (may be e.g. a hook, a Zle widget, etc.).
 
+Ftag::copy::file
+~~~~~~~~~~~~~~~~
+
+____
+ 
+ FUNCTION: Ftag::copy::file [[[
+____
+
+Has 55 line(s). Calls functions:
+
+ Ftag::copy::file
+ |-- +Ftag::msg
+ |-- Ftag::dep
+ `-- OS::notify
+     `-- Ftag::dep
+
+Uses feature(s): _setopt_, _vared_
+
+Called by:
+
+ Script-Body
+
 Ftag::declare
 ~~~~~~~~~~~~~
 
 ____
- # FUNCTION: Ftag::declare [[[
- # Declare global variable for config
+ 
+ FUNCTION: Ftag::declare [[[
+ Declare global variable for config
 ____
 
 Has 9 line(s). Doesn't call other functions.
@@ -239,11 +307,11 @@ Ftag::default_header
 ~~~~~~~~~~~~~~~~~~~~
 
 ____
- # == SECTION: Functions: Formatting and Display == [[[
- # FUNCTION: Ftag::default_header [[[
- # Default header displayed on commands asking for input
- # Sub-Zero // ansi_shadow / ANSI_regular
- # big / doom / small / standard
+ 
+ SECTION: Functions: Formatting and Display == [[[
+ FUNCTION: Ftag::default_header [[[
+ Default header displayed on commands asking for input
+ Sub-Zero // ansi_shadow / ANSI_regular / big / doom / small / standard
 ____
 
 Has 9 line(s). Doesn't call other functions.
@@ -262,32 +330,51 @@ Ftag::dep
 ~~~~~~~~~
 
 ____
- # FUNCTION: Ftag::dep [[[
- # $1 - dependency to check
- # If '-e', will throw error
+ 
+ FUNCTION: Ftag::dep [[[
+ $1 - dependency to check
+ If '-e', will throw error
 ____
 
-Has 7 line(s). Doesn't call other functions.
-
-Uses feature(s): _zparseopts_
+Has 8 line(s). Doesn't call other functions.
 
 Called by:
 
  Ftag::copy
+ Ftag::copy::file
  Ftag::dotbare
  Ftag::dua
- Ftag::forgit
+ Ftag::dust
  Ftag::gitui
  OS::notify
  Script-Body
+
+Ftag::dirstack
+~~~~~~~~~~~~~~
+
+____
+ 
+ FUNCTION: Ftag::dirstack [[[
+ Use fzf to display dirstack and switch directories
+____
+
+Has 13 line(s). Calls functions:
+
+ Ftag::dirstack
+ `-- +Ftag::msg
+
+Uses feature(s): _source_, _zle_, _zmodload_
+
+Not called by script or any function (may be e.g. a hook, a Zle widget, etc.).
 
 Ftag::dotbare
 ~~~~~~~~~~~~~
 
 ____
- # FUNCTION: Ftag::dotbare [[[
- # If dir is git use dotbare in that dir; else use on dotfiles
- # Brings up own interactive menu
+ 
+ FUNCTION: Ftag::dotbare [[[
+ If dir is git use dotbare in that dir; else use on dotfiles
+ Brings up own interactive menu
 ____
 
 Has 17 line(s). Calls functions:
@@ -306,8 +393,9 @@ Ftag::dua
 ~~~~~~~~~
 
 ____
- # FUNCTION: Ftag::dua [[[
- # Open directory in dua interactively
+ 
+ FUNCTION: Ftag::dua [[[
+ Open directory in dua interactively
 ____
 
 Has 8 line(s). Calls functions:
@@ -319,12 +407,31 @@ Called by:
 
  Script-Body
 
+Ftag::dust
+~~~~~~~~~~
+
+____
+ 
+ FUNCTION: Ftag::dust [[[
+ View directory/file size in dust or diskus
+____
+
+Has 8 line(s). Calls functions:
+
+ Ftag::dust
+ `-- Ftag::dep
+
+Called by:
+
+ Script-Body
+
 Ftag::env_vars
 ~~~~~~~~~~~~~~
 
 ____
- # FUNCTION: Ftag::env_vars [[[
- # Display environment variables for ftag
+ 
+ FUNCTION: Ftag::env_vars [[[
+ Display environment variables for ftag
 ____
 
 Has 10 line(s). Calls functions:
@@ -334,27 +441,25 @@ Has 10 line(s). Calls functions:
 
 Uses feature(s): _setopt_
 
-Called by:
-
- Ftag::show_keys
+Not called by script or any function (may be e.g. a hook, a Zle widget, etc.).
 
 Ftag::forgit
 ~~~~~~~~~~~~
 
 ____
- # FUNCTION: Ftag::forgit [[[
- # Open directory if git and use forgit
+ 
+ FUNCTION: Ftag::forgit [[[
+ Open directory if git and use forgit
 ____
 
-Has 50 line(s). Calls functions:
+Has 49 line(s). Calls functions:
 
  Ftag::forgit
- |-- Ftag::dep
  |-- Ftag::is_git
  `-- OS::notify
      `-- Ftag::dep
 
-Uses feature(s): _source_, _zmodload_
+Uses feature(s): _source_, _zle_, _zmodload_
 
 Called by:
 
@@ -364,8 +469,9 @@ Ftag::format_length
 ~~~~~~~~~~~~~~~~~~~
 
 ____
- # FUNCTION: Ftag::format_length [[[
- # Could use to split lines based on $#COLUMN
+ 
+ FUNCTION: Ftag::format_length [[[
+ Could use to split lines based on $#COLUMN
 ____
 
 Has 36 line(s). Doesn't call other functions.
@@ -378,8 +484,9 @@ Ftag::gitui
 ~~~~~~~~~~~
 
 ____
- # FUNCTION: Ftag::gitui [[[
- # If directory is a git-dir (switch git check to func) then use lazygit or tig
+ 
+ FUNCTION: Ftag::gitui [[[
+ If directory is a git-dir (switch git check to func) then use lazygit or tig
 ____
 
 Has 3 line(s). Calls functions:
@@ -395,8 +502,9 @@ Ftag::glow
 ~~~~~~~~~~
 
 ____
- # FUNCTION: Ftag::glow [[[
- # Open directory to browse markdown files
+ 
+ FUNCTION: Ftag::glow [[[
+ Open directory to browse markdown files
 ____
 
 Has 5 line(s). Doesn't call other functions.
@@ -409,9 +517,10 @@ Ftag::gpg
 ~~~~~~~~~
 
 ____
- # FUNCTION: Ftag::gpg [[[
- # Open and edit an encrypted file (-e)
- # Default is to encrypted if decrypted or vice versa
+ 
+ FUNCTION: Ftag::gpg [[[
+ Open and edit an encrypted file (-e)
+ Default is to encrypted if decrypted or vice versa
 ____
 
 Has 27 line(s). Doesn't call other functions.
@@ -426,7 +535,8 @@ Ftag::is_git
 ~~~~~~~~~~~~
 
 ____
- # FUNCTION: Ftag::is_git [[[
+ 
+ FUNCTION: Ftag::is_git [[[
 ____
 
 Has 1 line(s). Doesn't call other functions.
@@ -441,8 +551,9 @@ Ftag::lolcat
 ~~~~~~~~~~~~
 
 ____
- # ]]]
- # FUNCTION: Ftag::lolcat [[[
+ 
+ ]]]
+ FUNCTION: Ftag::lolcat [[[
 ____
 
 Has 3 line(s). Calls functions:
@@ -458,8 +569,9 @@ Ftag::map-back
 ~~~~~~~~~~~~~~
 
 ____
- # FUNCTION: Ftag::map-back [[[
- # $1 - File path to map back to original path
+ 
+ FUNCTION: Ftag::map-back [[[
+ $1 - File path to map back to original path
 ____
 
 Has 12 line(s). Doesn't call other functions.
@@ -475,8 +587,9 @@ Ftag::map-short
 ~~~~~~~~~~~~~~~
 
 ____
- # FUNCTION: Ftag::map-short [[[
- # $1 - File path to color and map to map hash
+ 
+ FUNCTION: Ftag::map-short [[[
+ $1 - File path to color and map to map hash
 ____
 
 Has 6 line(s). Doesn't call other functions.
@@ -487,13 +600,41 @@ Called by:
 
  Ftag::tag
 
+Ftag::open::with
+~~~~~~~~~~~~~~~~
+
+____
+ 
+ FUNCTION: Ftag::open::with [[[
+ Prompt user to open file/directory with application
+____
+
+Has 15 line(s). Calls functions:
+
+ Ftag::open::with
+ `-- Ftag::parse_format
+     |-- Ftag::boxes
+     |   `-- +Ftag::msg
+     |-- Ftag::default_header
+     |-- Ftag::lolcat
+     |   `-- +Ftag::msg
+     `-- Ftag::toilet
+         `-- +Ftag::msg
+
+Uses feature(s): _vared_
+
+Called by:
+
+ Script-Body
+
 Ftag::opts
 ~~~~~~~~~~
 
 ____
- # FUNCTION: Ftag::opts [[[
- # Check if option was passed
- # $@ - string of options; e.g., "h help"
+ 
+ FUNCTION: Ftag::opts [[[
+ Check if option was passed
+ $@ - string of options; e.g., "h help"
 ____
 
 Has 1 line(s). Doesn't call other functions.
@@ -506,9 +647,27 @@ Ftag::parallel
 ~~~~~~~~~~~~~~
 
 ____
- # SECTION: == Unused == [[[
- # FUNCTION: Ftag::parallel [[[
- # An attempt to make reloading faster with many tags
+ 
+ FUNCTION: Ftag::parallel [[[
+____
+
+Has 14 line(s). Doesn't call other functions.
+
+Called by:
+
+ Ftag::show_keys
+ Ftag::usage
+ Script-Body
+
+Ftag::parallel2
+~~~~~~~~~~~~~~~
+
+____
+ 
+ SECTION: == Unused == [[[
+ FUNCTION: Ftag::parallel2 [[[
+ An attempt to make reloading faster with many tags
+ Still learning file descriptors
 ____
 
 Has 7 line(s). Doesn't call other functions.
@@ -521,8 +680,9 @@ Ftag::parse_format
 ~~~~~~~~~~~~~~~~~~
 
 ____
- # FUNCTION: Ftag::parse_format [[[
- # Display with either toilet, lolcat, or boxes
+ 
+ FUNCTION: Ftag::parse_format [[[
+ Display with either toilet, lolcat, or boxes
 ____
 
 Has 23 line(s). Calls functions:
@@ -540,15 +700,17 @@ Uses feature(s): _setopt_
 
 Called by:
 
+ Ftag::open::with
  Script-Body
 
 Ftag::path::find
 ~~~~~~~~~~~~~~~~
 
 ____
- # FUNCTION: Ftag::path::find [[[
- # Enter in custom path to switch directories
- # TODO: create a prompt to switch paths
+ 
+ FUNCTION: Ftag::path::find [[[
+ Enter in custom path to switch directories
+ TODO: create a prompt to switch paths
 ____
 
 Has 1 line(s). Doesn't call other functions.
@@ -559,33 +721,32 @@ Ftag::show_keys
 ~~~~~~~~~~~~~~~
 
 ____
- # FUNCTION: Ftag::show_keys [[[
- # Display keybindings within fzf
+ 
+ FUNCTION: Ftag::show_keys [[[
+ Display keybindings within fzf
 ____
 
 Has 10 line(s). Calls functions:
 
  Ftag::show_keys
- `-- Ftag::env_vars
-     `-- +Ftag::msg
+ `-- Ftag::parallel
 
 Uses feature(s): _setopt_
 
-Called by:
-
- Ftag::usage
+Not called by script or any function (may be e.g. a hook, a Zle widget, etc.).
 
 Ftag::tag
 ~~~~~~~~~
 
 ____
- # FUNCTION: Ftag::tag [[[
- # Tag wrapper to color the output
- # TODO: add a header and column separator
- # TODO: speed up
+ 
+ FUNCTION: Ftag::tag [[[
+ Tag wrapper to color the output
+ TODO: add a header and column separator
+ TODO: speed up
 ____
 
-Has 146 line(s). Calls functions:
+Has 241 line(s). Calls functions:
 
  Ftag::tag
  |-- +Ftag::msg
@@ -602,8 +763,9 @@ Ftag::toilet
 ~~~~~~~~~~~~
 
 ____
- # ]]]
- # FUNCTION: Ftag::toilet [[[
+ 
+ ]]]
+ FUNCTION: Ftag::toilet [[[
 ____
 
 Has 5 line(s). Calls functions:
@@ -619,8 +781,9 @@ Ftag::twf
 ~~~~~~~~~
 
 ____
- # FUNCTION: Ftag::twf [[[
- # Open directory in twf (similar to fzf)
+ 
+ FUNCTION: Ftag::twf [[[
+ Open directory in twf (similar to fzf)
 ____
 
 Has 11 line(s). Doesn't call other functions.
@@ -635,8 +798,9 @@ Ftag::usage
 ~~~~~~~~~~~
 
 ____
- # FUNCTION: Ftag::usage [[[
- # Display typical help message
+ 
+ FUNCTION: Ftag::usage [[[
+ Display typical help message
 ____
 
 Has 25 line(s). Calls functions:
@@ -644,9 +808,7 @@ Has 25 line(s). Calls functions:
  Ftag::usage
  |-- +Ftag::msg
  |-- Ftag::default_header
- `-- Ftag::show_keys
-     `-- Ftag::env_vars
-         `-- +Ftag::msg
+ `-- Ftag::parallel
 
 Uses feature(s): _setopt_
 
@@ -658,11 +820,12 @@ Ftag::vared-format
 ~~~~~~~~~~~~~~~~~~
 
 ____
- # FUNCTION: Ftag::vared-format [[[
- # Display tags for 'vared' in the main loop
- #             
- #  ❱ ❯  ⎣1⎤ ❪1❫ ⟦1⟧  ◂▸
- # (->|=>|→)
+ 
+ FUNCTION: Ftag::vared-format [[[
+ Display tags for 'vared' in the main loop
+             
+  ❱ ❯  ⎣1⎤ ❪1❫ ⟦1⟧  ◂▸
+ (->|=>|→)
 ____
 
 Has 21 line(s). Calls functions:
@@ -678,14 +841,13 @@ Ftag::wutag
 ~~~~~~~~~~~
 
 ____
- # FUNCTION: Ftag::wutag [[[
- # $1 = directory; $2 = filename; $3 = tag
- # Option to use wutag alongside tag with '-w' or wutag alone with '-ww'
+ 
+ FUNCTION: Ftag::wutag [[[
+ $1 = directory; $2 = filename; $3 = tag
+ Option to use wutag alongside tag with '-w' or wutag alone with '-ww'
 ____
 
-Has 11 line(s). Doesn't call other functions.
-
-Uses feature(s): _zparseopts_
+Has 10 line(s). Doesn't call other functions.
 
 Called by:
 
@@ -695,21 +857,40 @@ Ftag::zoxide
 ~~~~~~~~~~~~
 
 ____
- # SECTION: == Functions: Actions == [[[
- # FUNCTION: Ftag::zoxide [[[
- # Switch or query directory with zoxide
+ 
+ SECTION: == Functions: Actions == [[[
+ FUNCTION: Ftag::zoxide [[[
+ Switch or query directory with zoxide
 ____
 
 Has 1 line(s). Doesn't call other functions.
 
 Not called by script or any function (may be e.g. a hook, a Zle widget, etc.).
 
+Ftag::zstyle
+~~~~~~~~~~~~
+
+____
+ 
+ FUNCTION: Ftag::zstyle [[[
+ Wrapper function for zstyle
+____
+
+Has 1 line(s). Doesn't call other functions.
+
+Uses feature(s): _zstyle_
+
+Called by:
+
+ Script-Body
+
 OS::notify
 ~~~~~~~~~~
 
 ____
- # FUNCTION: OS::notify [[[
- # TODO: add option to permanently set notifications
+ 
+ FUNCTION: OS::notify [[[
+ TODO: add option to permanently set notifications
 ____
 
 Has 3 line(s). Calls functions:
@@ -719,6 +900,7 @@ Has 3 line(s). Calls functions:
 
 Called by:
 
+ Ftag::copy::file
  Ftag::forgit
  Script-Body
 

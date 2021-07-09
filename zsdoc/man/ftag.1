@@ -1,0 +1,1456 @@
+'\" t
+.\"     Title: ftag
+.\"    Author: [FIXME: author] [see http://www.docbook.org/tdg5/en/html/author]
+.\" Generator: DocBook XSL Stylesheets vsnapshot <http://docbook.sf.net/>
+.\"      Date: 07/09/2021
+.\"    Manual: \ \&
+.\"    Source: \ \&
+.\"  Language: English
+.\"
+.TH "FTAG" "1" "07/09/2021" "\ \&" "\ \&"
+.\" -----------------------------------------------------------------
+.\" * Define some portability stuff
+.\" -----------------------------------------------------------------
+.\" ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+.\" http://bugs.debian.org/507673
+.\" http://lists.gnu.org/archive/html/groff/2009-02/msg00013.html
+.\" ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+.ie \n(.g .ds Aq \(aq
+.el       .ds Aq '
+.\" -----------------------------------------------------------------
+.\" * set default formatting
+.\" -----------------------------------------------------------------
+.\" disable hyphenation
+.nh
+.\" disable justification (adjust text to left margin only)
+.ad l
+.\" -----------------------------------------------------------------
+.\" * MAIN CONTENT STARTS HERE *
+.\" -----------------------------------------------------------------
+.SH "NAME"
+ftag \- a shell script
+.SH "SYNOPSIS"
+.sp
+Documentation automatically generated with \(oqzshelldoc\(cq
+.SH "FUNCTIONS"
+.sp
+.if n \{\
+.RS 4
+.\}
+.nf
++Ftag::msg
+@Ftag::sched
+Ftag::RG
+Ftag::autojump
+Ftag::boxes
+Ftag::cleanup
+Ftag::color\-tag
+Ftag::copy
+Ftag::copy::file
+Ftag::declare
+Ftag::default_header
+Ftag::dep
+Ftag::dirstack
+Ftag::dotbare
+Ftag::dua
+Ftag::dust
+Ftag::env_vars
+Ftag::forgit
+Ftag::format_length
+Ftag::gitui
+Ftag::glow
+Ftag::gpg
+Ftag::is_git
+Ftag::lolcat
+Ftag::map\-back
+Ftag::map\-short
+Ftag::open::with
+Ftag::opts
+Ftag::parallel
+Ftag::parallel2
+Ftag::parse_format
+Ftag::path::find
+Ftag::show_keys
+Ftag::tag
+Ftag::toilet
+Ftag::twf
+Ftag::usage
+Ftag::vared\-format
+Ftag::wutag
+Ftag::zoxide
+Ftag::zstyle
+OS::notify
+.fi
+.if n \{\
+.RE
+.\}
+.SH "DETAILS"
+.SS "Script Body"
+.sp
+Has 807 line(s)\&. Calls functions:
+.sp
+.if n \{\
+.RS 4
+.\}
+.nf
+Script\-Body
+|\-\- +Ftag::msg
+|\-\- Ftag::RG
+|\-\- Ftag::copy::file
+|\ \&\ \& |\-\- +Ftag::msg
+|\ \&\ \& |\-\- Ftag::dep
+|\ \&\ \& `\-\- OS::notify
+|\ \&\ \&     `\-\- Ftag::dep
+|\-\- Ftag::declare
+|\-\- Ftag::default_header
+|\-\- Ftag::dep
+|\-\- Ftag::dotbare
+|\ \&\ \& |\-\- Ftag::dep
+|\ \&\ \& `\-\- Ftag::is_git
+|\-\- Ftag::dua
+|\ \&\ \& `\-\- Ftag::dep
+|\-\- Ftag::dust
+|\ \&\ \& `\-\- Ftag::dep
+|\-\- Ftag::forgit
+|\ \&\ \& |\-\- Ftag::is_git
+|\ \&\ \& `\-\- OS::notify
+|\ \&\ \&     `\-\- Ftag::dep
+|\-\- Ftag::gitui
+|\ \&\ \& `\-\- Ftag::dep
+|\-\- Ftag::glow
+|\-\- Ftag::gpg
+|\-\- Ftag::is_git
+|\-\- Ftag::map\-back
+|\-\- Ftag::open::with
+|\ \&\ \& `\-\- Ftag::parse_format
+|\ \&\ \&     |\-\- Ftag::boxes
+|\ \&\ \&     |\ \&\ \& `\-\- +Ftag::msg
+|\ \&\ \&     |\-\- Ftag::default_header
+|\ \&\ \&     |\-\- Ftag::lolcat
+|\ \&\ \&     |\ \&\ \& `\-\- +Ftag::msg
+|\ \&\ \&     `\-\- Ftag::toilet
+|\ \&\ \&         `\-\- +Ftag::msg
+|\-\- Ftag::opts
+|\-\- Ftag::parallel
+|\-\- Ftag::parse_format
+|\ \&\ \& |\-\- Ftag::boxes
+|\ \&\ \& |\ \&\ \& `\-\- +Ftag::msg
+|\ \&\ \& |\-\- Ftag::default_header
+|\ \&\ \& |\-\- Ftag::lolcat
+|\ \&\ \& |\ \&\ \& `\-\- +Ftag::msg
+|\ \&\ \& `\-\- Ftag::toilet
+|\ \&\ \&     `\-\- +Ftag::msg
+|\-\- Ftag::tag
+|\ \&\ \& |\-\- +Ftag::msg
+|\ \&\ \& |\-\- Ftag::color\-tag
+|\ \&\ \& `\-\- Ftag::map\-short
+|\-\- Ftag::twf
+|\-\- Ftag::usage
+|\ \&\ \& |\-\- +Ftag::msg
+|\ \&\ \& |\-\- Ftag::default_header
+|\ \&\ \& `\-\- Ftag::parallel
+|\-\- Ftag::wutag
+|\-\- Ftag::zstyle
+`\-\- OS::notify
+    `\-\- Ftag::dep
+.fi
+.if n \{\
+.RE
+.\}
+.sp
+Uses feature(s): \fIexport\fR, \fIread\fR, \fIsetopt\fR, \fItrap\fR, \fIvared\fR, \fIzmodload\fR, \fIzparseopts\fR
+.sp
+\fIExports (environment):\fR FZFTAG_BOXES \fB//\fR FZFTAG_FONT \fB//\fR FZFTAG_LOLCAT \fB//\fR FZFTAG_PATH \fB//\fR FZFTAG_QUERY \fB//\fR FZFTAG_TOILET \fB//\fR FZFTAG_WTAG \fB//\fR LESS \fB//\fR WRAPPER
+.SS "+Ftag::msg"
+.sp
+.if n \{\
+.RS 4
+.\}
+.nf
+SECTION: == Functions: Helper == [[[
+FUNCTION: +Ftag::msg [[[
+Map colors to FTAG array and recognize errors and warnings
+.fi
+.if n \{\
+.RE
+.\}
+.sp
+Has 18 line(s)\&. Doesn\(cqt call other functions\&.
+.sp
+Uses feature(s): \fIsetopt\fR
+.sp
+Called by:
+.sp
+.if n \{\
+.RS 4
+.\}
+.nf
+Ftag::boxes
+Ftag::copy::file
+Ftag::dirstack
+Ftag::env_vars
+Ftag::lolcat
+Ftag::tag
+Ftag::toilet
+Ftag::usage
+Script\-Body
+.fi
+.if n \{\
+.RE
+.\}
+.SS "@Ftag::sched"
+.sp
+.if n \{\
+.RS 4
+.\}
+.nf
+FUNCTION: @Ftag::sched [[[
+.fi
+.if n \{\
+.RE
+.\}
+.sp
+Has 9 line(s)\&. Doesn\(cqt call other functions\&.
+.sp
+Uses feature(s): \fIsched\fR, \fIzle\fR, \fIzmodload\fR
+.sp
+Not called by script or any function (may be e\&.g\&. a hook, a Zle widget, etc\&.)\&.
+.SS "Ftag::RG"
+.sp
+.if n \{\
+.RS 4
+.\}
+.nf
+FUNCTION: Ftag::RG [[[
+Open directory and interactively search with ripgrep
+Default action is to open in editor
+TODO: add options to fzf
+.fi
+.if n \{\
+.RE
+.\}
+.sp
+Has 24 line(s)\&. Doesn\(cqt call other functions\&.
+.sp
+Called by:
+.sp
+.if n \{\
+.RS 4
+.\}
+.nf
+Script\-Body
+.fi
+.if n \{\
+.RE
+.\}
+.SS "Ftag::autojump"
+.sp
+.if n \{\
+.RS 4
+.\}
+.nf
+FUNCTION: Ftag::autojump [[[
+Switch or query directory with autojump
+.fi
+.if n \{\
+.RE
+.\}
+.sp
+Has 3 line(s)\&. Doesn\(cqt call other functions\&.
+.sp
+Not called by script or any function (may be e\&.g\&. a hook, a Zle widget, etc\&.)\&.
+.SS "Ftag::boxes"
+.sp
+.if n \{\
+.RS 4
+.\}
+.nf
+FUNCTION: Ftag::boxes [[[
+Format header display from CLI
+.fi
+.if n \{\
+.RE
+.\}
+.sp
+Has 3 line(s)\&. Calls functions:
+.sp
+.if n \{\
+.RS 4
+.\}
+.nf
+Ftag::boxes
+`\-\- +Ftag::msg
+.fi
+.if n \{\
+.RE
+.\}
+.sp
+Called by:
+.sp
+.if n \{\
+.RS 4
+.\}
+.nf
+Ftag::parse_format
+.fi
+.if n \{\
+.RE
+.\}
+.SS "Ftag::cleanup"
+.sp
+.if n \{\
+.RS 4
+.\}
+.nf
+FUNCTION: Ftag::cleanup [[[
+TODO: look into named pipes
+.fi
+.if n \{\
+.RE
+.\}
+.sp
+Has 2 line(s)\&. Doesn\(cqt call other functions\&.
+.sp
+Not called by script or any function (may be e\&.g\&. a hook, a Zle widget, etc\&.)\&.
+.SS "Ftag::color\-tag"
+.sp
+.if n \{\
+.RS 4
+.\}
+.nf
+FUNCTION: Ftag::color\-tag [[[
+$1 \- Tag to color
+.fi
+.if n \{\
+.RE
+.\}
+.sp
+Has 4 line(s)\&. Doesn\(cqt call other functions\&.
+.sp
+Uses feature(s): \fIsetopt\fR
+.sp
+Called by:
+.sp
+.if n \{\
+.RS 4
+.\}
+.nf
+Ftag::tag
+.fi
+.if n \{\
+.RE
+.\}
+.SS "Ftag::copy"
+.sp
+.if n \{\
+.RS 4
+.\}
+.nf
+FUNCTION: Ftag::copy [[[
+Determine copy command
+TODO: use this or no?
+.fi
+.if n \{\
+.RE
+.\}
+.sp
+Has 4 line(s)\&. Calls functions:
+.sp
+.if n \{\
+.RS 4
+.\}
+.nf
+Ftag::copy
+`\-\- Ftag::dep
+.fi
+.if n \{\
+.RE
+.\}
+.sp
+Not called by script or any function (may be e\&.g\&. a hook, a Zle widget, etc\&.)\&.
+.SS "Ftag::copy::file"
+.sp
+.if n \{\
+.RS 4
+.\}
+.nf
+FUNCTION: Ftag::copy::file [[[
+.fi
+.if n \{\
+.RE
+.\}
+.sp
+Has 55 line(s)\&. Calls functions:
+.sp
+.if n \{\
+.RS 4
+.\}
+.nf
+Ftag::copy::file
+|\-\- +Ftag::msg
+|\-\- Ftag::dep
+`\-\- OS::notify
+    `\-\- Ftag::dep
+.fi
+.if n \{\
+.RE
+.\}
+.sp
+Uses feature(s): \fIsetopt\fR, \fIvared\fR
+.sp
+Called by:
+.sp
+.if n \{\
+.RS 4
+.\}
+.nf
+Script\-Body
+.fi
+.if n \{\
+.RE
+.\}
+.SS "Ftag::declare"
+.sp
+.if n \{\
+.RS 4
+.\}
+.nf
+FUNCTION: Ftag::declare [[[
+Declare global variable for config
+.fi
+.if n \{\
+.RE
+.\}
+.sp
+Has 9 line(s)\&. Doesn\(cqt call other functions\&.
+.sp
+Uses feature(s): \fIeval\fR
+.sp
+Called by:
+.sp
+.if n \{\
+.RS 4
+.\}
+.nf
+Script\-Body
+.fi
+.if n \{\
+.RE
+.\}
+.SS "Ftag::default_header"
+.sp
+.if n \{\
+.RS 4
+.\}
+.nf
+SECTION: Functions: Formatting and Display == [[[
+FUNCTION: Ftag::default_header [[[
+Default header displayed on commands asking for input
+Sub\-Zero // ansi_shadow / ANSI_regular / big / doom / small / standard
+.fi
+.if n \{\
+.RE
+.\}
+.sp
+Has 9 line(s)\&. Doesn\(cqt call other functions\&.
+.sp
+Uses feature(s): \fIzparseopts\fR
+.sp
+Called by:
+.sp
+.if n \{\
+.RS 4
+.\}
+.nf
+Ftag::parse_format
+Ftag::usage
+Script\-Body
+.fi
+.if n \{\
+.RE
+.\}
+.sp
+\fIEnvironment variables used:\fR FZFTAG_FONT
+.SS "Ftag::dep"
+.sp
+.if n \{\
+.RS 4
+.\}
+.nf
+FUNCTION: Ftag::dep [[[
+$1 \- dependency to check
+If \*(Aq\-e\*(Aq, will throw error
+.fi
+.if n \{\
+.RE
+.\}
+.sp
+Has 8 line(s)\&. Doesn\(cqt call other functions\&.
+.sp
+Called by:
+.sp
+.if n \{\
+.RS 4
+.\}
+.nf
+Ftag::copy
+Ftag::copy::file
+Ftag::dotbare
+Ftag::dua
+Ftag::dust
+Ftag::gitui
+OS::notify
+Script\-Body
+.fi
+.if n \{\
+.RE
+.\}
+.SS "Ftag::dirstack"
+.sp
+.if n \{\
+.RS 4
+.\}
+.nf
+FUNCTION: Ftag::dirstack [[[
+Use fzf to display dirstack and switch directories
+.fi
+.if n \{\
+.RE
+.\}
+.sp
+Has 13 line(s)\&. Calls functions:
+.sp
+.if n \{\
+.RS 4
+.\}
+.nf
+Ftag::dirstack
+`\-\- +Ftag::msg
+.fi
+.if n \{\
+.RE
+.\}
+.sp
+Uses feature(s): \fIsource\fR, \fIzle\fR, \fIzmodload\fR
+.sp
+Not called by script or any function (may be e\&.g\&. a hook, a Zle widget, etc\&.)\&.
+.SS "Ftag::dotbare"
+.sp
+.if n \{\
+.RS 4
+.\}
+.nf
+FUNCTION: Ftag::dotbare [[[
+If dir is git use dotbare in that dir; else use on dotfiles
+Brings up own interactive menu
+.fi
+.if n \{\
+.RE
+.\}
+.sp
+Has 17 line(s)\&. Calls functions:
+.sp
+.if n \{\
+.RS 4
+.\}
+.nf
+Ftag::dotbare
+|\-\- Ftag::dep
+`\-\- Ftag::is_git
+.fi
+.if n \{\
+.RE
+.\}
+.sp
+Uses feature(s): \fIsetopt\fR
+.sp
+Called by:
+.sp
+.if n \{\
+.RS 4
+.\}
+.nf
+Script\-Body
+.fi
+.if n \{\
+.RE
+.\}
+.SS "Ftag::dua"
+.sp
+.if n \{\
+.RS 4
+.\}
+.nf
+FUNCTION: Ftag::dua [[[
+Open directory in dua interactively
+.fi
+.if n \{\
+.RE
+.\}
+.sp
+Has 8 line(s)\&. Calls functions:
+.sp
+.if n \{\
+.RS 4
+.\}
+.nf
+Ftag::dua
+`\-\- Ftag::dep
+.fi
+.if n \{\
+.RE
+.\}
+.sp
+Called by:
+.sp
+.if n \{\
+.RS 4
+.\}
+.nf
+Script\-Body
+.fi
+.if n \{\
+.RE
+.\}
+.SS "Ftag::dust"
+.sp
+.if n \{\
+.RS 4
+.\}
+.nf
+FUNCTION: Ftag::dust [[[
+View directory/file size in dust or diskus
+.fi
+.if n \{\
+.RE
+.\}
+.sp
+Has 8 line(s)\&. Calls functions:
+.sp
+.if n \{\
+.RS 4
+.\}
+.nf
+Ftag::dust
+`\-\- Ftag::dep
+.fi
+.if n \{\
+.RE
+.\}
+.sp
+Called by:
+.sp
+.if n \{\
+.RS 4
+.\}
+.nf
+Script\-Body
+.fi
+.if n \{\
+.RE
+.\}
+.SS "Ftag::env_vars"
+.sp
+.if n \{\
+.RS 4
+.\}
+.nf
+FUNCTION: Ftag::env_vars [[[
+Display environment variables for ftag
+.fi
+.if n \{\
+.RE
+.\}
+.sp
+Has 10 line(s)\&. Calls functions:
+.sp
+.if n \{\
+.RS 4
+.\}
+.nf
+Ftag::env_vars
+`\-\- +Ftag::msg
+.fi
+.if n \{\
+.RE
+.\}
+.sp
+Uses feature(s): \fIsetopt\fR
+.sp
+Not called by script or any function (may be e\&.g\&. a hook, a Zle widget, etc\&.)\&.
+.SS "Ftag::forgit"
+.sp
+.if n \{\
+.RS 4
+.\}
+.nf
+FUNCTION: Ftag::forgit [[[
+Open directory if git and use forgit
+.fi
+.if n \{\
+.RE
+.\}
+.sp
+Has 49 line(s)\&. Calls functions:
+.sp
+.if n \{\
+.RS 4
+.\}
+.nf
+Ftag::forgit
+|\-\- Ftag::is_git
+`\-\- OS::notify
+    `\-\- Ftag::dep
+.fi
+.if n \{\
+.RE
+.\}
+.sp
+Uses feature(s): \fIsource\fR, \fIzle\fR, \fIzmodload\fR
+.sp
+Called by:
+.sp
+.if n \{\
+.RS 4
+.\}
+.nf
+Script\-Body
+.fi
+.if n \{\
+.RE
+.\}
+.SS "Ftag::format_length"
+.sp
+.if n \{\
+.RS 4
+.\}
+.nf
+FUNCTION: Ftag::format_length [[[
+Could use to split lines based on $#COLUMN
+.fi
+.if n \{\
+.RE
+.\}
+.sp
+Has 36 line(s)\&. Doesn\(cqt call other functions\&.
+.sp
+Uses feature(s): \fIsetopt\fR
+.sp
+Not called by script or any function (may be e\&.g\&. a hook, a Zle widget, etc\&.)\&.
+.SS "Ftag::gitui"
+.sp
+.if n \{\
+.RS 4
+.\}
+.nf
+FUNCTION: Ftag::gitui [[[
+If directory is a git\-dir (switch git check to func) then use lazygit or tig
+.fi
+.if n \{\
+.RE
+.\}
+.sp
+Has 3 line(s)\&. Calls functions:
+.sp
+.if n \{\
+.RS 4
+.\}
+.nf
+Ftag::gitui
+`\-\- Ftag::dep
+.fi
+.if n \{\
+.RE
+.\}
+.sp
+Called by:
+.sp
+.if n \{\
+.RS 4
+.\}
+.nf
+Script\-Body
+.fi
+.if n \{\
+.RE
+.\}
+.SS "Ftag::glow"
+.sp
+.if n \{\
+.RS 4
+.\}
+.nf
+FUNCTION: Ftag::glow [[[
+Open directory to browse markdown files
+.fi
+.if n \{\
+.RE
+.\}
+.sp
+Has 5 line(s)\&. Doesn\(cqt call other functions\&.
+.sp
+Called by:
+.sp
+.if n \{\
+.RS 4
+.\}
+.nf
+Script\-Body
+.fi
+.if n \{\
+.RE
+.\}
+.SS "Ftag::gpg"
+.sp
+.if n \{\
+.RS 4
+.\}
+.nf
+FUNCTION: Ftag::gpg [[[
+Open and edit an encrypted file (\-e)
+Default is to encrypted if decrypted or vice versa
+.fi
+.if n \{\
+.RE
+.\}
+.sp
+Has 27 line(s)\&. Doesn\(cqt call other functions\&.
+.sp
+Uses feature(s): \fIsetopt\fR, \fItrap\fR, \fIzmodload\fR, \fIzparseopts\fR
+.sp
+Called by:
+.sp
+.if n \{\
+.RS 4
+.\}
+.nf
+Script\-Body
+.fi
+.if n \{\
+.RE
+.\}
+.SS "Ftag::is_git"
+.sp
+.if n \{\
+.RS 4
+.\}
+.nf
+FUNCTION: Ftag::is_git [[[
+.fi
+.if n \{\
+.RE
+.\}
+.sp
+Has 1 line(s)\&. Doesn\(cqt call other functions\&.
+.sp
+Called by:
+.sp
+.if n \{\
+.RS 4
+.\}
+.nf
+Ftag::dotbare
+Ftag::forgit
+Script\-Body
+.fi
+.if n \{\
+.RE
+.\}
+.SS "Ftag::lolcat"
+.sp
+.if n \{\
+.RS 4
+.\}
+.nf
+]]]
+FUNCTION: Ftag::lolcat [[[
+.fi
+.if n \{\
+.RE
+.\}
+.sp
+Has 3 line(s)\&. Calls functions:
+.sp
+.if n \{\
+.RS 4
+.\}
+.nf
+Ftag::lolcat
+`\-\- +Ftag::msg
+.fi
+.if n \{\
+.RE
+.\}
+.sp
+Called by:
+.sp
+.if n \{\
+.RS 4
+.\}
+.nf
+Ftag::parse_format
+.fi
+.if n \{\
+.RE
+.\}
+.SS "Ftag::map\-back"
+.sp
+.if n \{\
+.RS 4
+.\}
+.nf
+FUNCTION: Ftag::map\-back [[[
+$1 \- File path to map back to original path
+.fi
+.if n \{\
+.RE
+.\}
+.sp
+Has 12 line(s)\&. Doesn\(cqt call other functions\&.
+.sp
+Uses feature(s): \fIsetopt\fR
+.sp
+Called by:
+.sp
+.if n \{\
+.RS 4
+.\}
+.nf
+Ftag::vared\-format
+Script\-Body
+.fi
+.if n \{\
+.RE
+.\}
+.SS "Ftag::map\-short"
+.sp
+.if n \{\
+.RS 4
+.\}
+.nf
+FUNCTION: Ftag::map\-short [[[
+$1 \- File path to color and map to map hash
+.fi
+.if n \{\
+.RE
+.\}
+.sp
+Has 6 line(s)\&. Doesn\(cqt call other functions\&.
+.sp
+Uses feature(s): \fIsetopt\fR
+.sp
+Called by:
+.sp
+.if n \{\
+.RS 4
+.\}
+.nf
+Ftag::tag
+.fi
+.if n \{\
+.RE
+.\}
+.SS "Ftag::open::with"
+.sp
+.if n \{\
+.RS 4
+.\}
+.nf
+FUNCTION: Ftag::open::with [[[
+Prompt user to open file/directory with application
+.fi
+.if n \{\
+.RE
+.\}
+.sp
+Has 15 line(s)\&. Calls functions:
+.sp
+.if n \{\
+.RS 4
+.\}
+.nf
+Ftag::open::with
+`\-\- Ftag::parse_format
+    |\-\- Ftag::boxes
+    |\ \&\ \& `\-\- +Ftag::msg
+    |\-\- Ftag::default_header
+    |\-\- Ftag::lolcat
+    |\ \&\ \& `\-\- +Ftag::msg
+    `\-\- Ftag::toilet
+        `\-\- +Ftag::msg
+.fi
+.if n \{\
+.RE
+.\}
+.sp
+Uses feature(s): \fIvared\fR
+.sp
+Called by:
+.sp
+.if n \{\
+.RS 4
+.\}
+.nf
+Script\-Body
+.fi
+.if n \{\
+.RE
+.\}
+.SS "Ftag::opts"
+.sp
+.if n \{\
+.RS 4
+.\}
+.nf
+FUNCTION: Ftag::opts [[[
+Check if option was passed
+$@ \- string of options; e\&.g\&., "h help"
+.fi
+.if n \{\
+.RE
+.\}
+.sp
+Has 1 line(s)\&. Doesn\(cqt call other functions\&.
+.sp
+Called by:
+.sp
+.if n \{\
+.RS 4
+.\}
+.nf
+Script\-Body
+.fi
+.if n \{\
+.RE
+.\}
+.SS "Ftag::parallel"
+.sp
+.if n \{\
+.RS 4
+.\}
+.nf
+FUNCTION: Ftag::parallel [[[
+.fi
+.if n \{\
+.RE
+.\}
+.sp
+Has 14 line(s)\&. Doesn\(cqt call other functions\&.
+.sp
+Called by:
+.sp
+.if n \{\
+.RS 4
+.\}
+.nf
+Ftag::show_keys
+Ftag::usage
+Script\-Body
+.fi
+.if n \{\
+.RE
+.\}
+.SS "Ftag::parallel2"
+.sp
+.if n \{\
+.RS 4
+.\}
+.nf
+SECTION: == Unused == [[[
+FUNCTION: Ftag::parallel2 [[[
+An attempt to make reloading faster with many tags
+Still learning file descriptors
+.fi
+.if n \{\
+.RE
+.\}
+.sp
+Has 7 line(s)\&. Doesn\(cqt call other functions\&.
+.sp
+Uses feature(s): \fIzle\fR
+.sp
+Not called by script or any function (may be e\&.g\&. a hook, a Zle widget, etc\&.)\&.
+.SS "Ftag::parse_format"
+.sp
+.if n \{\
+.RS 4
+.\}
+.nf
+FUNCTION: Ftag::parse_format [[[
+Display with either toilet, lolcat, or boxes
+.fi
+.if n \{\
+.RE
+.\}
+.sp
+Has 23 line(s)\&. Calls functions:
+.sp
+.if n \{\
+.RS 4
+.\}
+.nf
+Ftag::parse_format
+|\-\- Ftag::boxes
+|\ \&\ \& `\-\- +Ftag::msg
+|\-\- Ftag::default_header
+|\-\- Ftag::lolcat
+|\ \&\ \& `\-\- +Ftag::msg
+`\-\- Ftag::toilet
+    `\-\- +Ftag::msg
+.fi
+.if n \{\
+.RE
+.\}
+.sp
+Uses feature(s): \fIsetopt\fR
+.sp
+Called by:
+.sp
+.if n \{\
+.RS 4
+.\}
+.nf
+Ftag::open::with
+Script\-Body
+.fi
+.if n \{\
+.RE
+.\}
+.SS "Ftag::path::find"
+.sp
+.if n \{\
+.RS 4
+.\}
+.nf
+FUNCTION: Ftag::path::find [[[
+Enter in custom path to switch directories
+TODO: create a prompt to switch paths
+.fi
+.if n \{\
+.RE
+.\}
+.sp
+Has 1 line(s)\&. Doesn\(cqt call other functions\&.
+.sp
+Not called by script or any function (may be e\&.g\&. a hook, a Zle widget, etc\&.)\&.
+.SS "Ftag::show_keys"
+.sp
+.if n \{\
+.RS 4
+.\}
+.nf
+FUNCTION: Ftag::show_keys [[[
+Display keybindings within fzf
+.fi
+.if n \{\
+.RE
+.\}
+.sp
+Has 10 line(s)\&. Calls functions:
+.sp
+.if n \{\
+.RS 4
+.\}
+.nf
+Ftag::show_keys
+`\-\- Ftag::parallel
+.fi
+.if n \{\
+.RE
+.\}
+.sp
+Uses feature(s): \fIsetopt\fR
+.sp
+Not called by script or any function (may be e\&.g\&. a hook, a Zle widget, etc\&.)\&.
+.SS "Ftag::tag"
+.sp
+.if n \{\
+.RS 4
+.\}
+.nf
+FUNCTION: Ftag::tag [[[
+Tag wrapper to color the output
+TODO: add a header and column separator
+TODO: speed up
+.fi
+.if n \{\
+.RE
+.\}
+.sp
+Has 241 line(s)\&. Calls functions:
+.sp
+.if n \{\
+.RS 4
+.\}
+.nf
+Ftag::tag
+|\-\- +Ftag::msg
+|\-\- Ftag::color\-tag
+`\-\- Ftag::map\-short
+.fi
+.if n \{\
+.RE
+.\}
+.sp
+Uses feature(s): \fIsetopt\fR
+.sp
+Called by:
+.sp
+.if n \{\
+.RS 4
+.\}
+.nf
+Script\-Body
+.fi
+.if n \{\
+.RE
+.\}
+.SS "Ftag::toilet"
+.sp
+.if n \{\
+.RS 4
+.\}
+.nf
+]]]
+FUNCTION: Ftag::toilet [[[
+.fi
+.if n \{\
+.RE
+.\}
+.sp
+Has 5 line(s)\&. Calls functions:
+.sp
+.if n \{\
+.RS 4
+.\}
+.nf
+Ftag::toilet
+`\-\- +Ftag::msg
+.fi
+.if n \{\
+.RE
+.\}
+.sp
+Called by:
+.sp
+.if n \{\
+.RS 4
+.\}
+.nf
+Ftag::parse_format
+.fi
+.if n \{\
+.RE
+.\}
+.SS "Ftag::twf"
+.sp
+.if n \{\
+.RS 4
+.\}
+.nf
+FUNCTION: Ftag::twf [[[
+Open directory in twf (similar to fzf)
+.fi
+.if n \{\
+.RE
+.\}
+.sp
+Has 11 line(s)\&. Doesn\(cqt call other functions\&.
+.sp
+Uses feature(s): \fIzparseopts\fR
+.sp
+Called by:
+.sp
+.if n \{\
+.RS 4
+.\}
+.nf
+Script\-Body
+.fi
+.if n \{\
+.RE
+.\}
+.SS "Ftag::usage"
+.sp
+.if n \{\
+.RS 4
+.\}
+.nf
+FUNCTION: Ftag::usage [[[
+Display typical help message
+.fi
+.if n \{\
+.RE
+.\}
+.sp
+Has 25 line(s)\&. Calls functions:
+.sp
+.if n \{\
+.RS 4
+.\}
+.nf
+Ftag::usage
+|\-\- +Ftag::msg
+|\-\- Ftag::default_header
+`\-\- Ftag::parallel
+.fi
+.if n \{\
+.RE
+.\}
+.sp
+Uses feature(s): \fIsetopt\fR
+.sp
+Called by:
+.sp
+.if n \{\
+.RS 4
+.\}
+.nf
+Script\-Body
+.fi
+.if n \{\
+.RE
+.\}
+.SS "Ftag::vared\-format"
+.sp
+.if n \{\
+.RS 4
+.\}
+.nf
+FUNCTION: Ftag::vared\-format [[[
+Display tags for \*(Aqvared\*(Aq in the main loop
+            
+ ❱ ❯  ⎣1⎤ ❪1❫ ⟦1⟧  ◂▸
+(\->|=>|→)
+.fi
+.if n \{\
+.RE
+.\}
+.sp
+Has 21 line(s)\&. Calls functions:
+.sp
+.if n \{\
+.RS 4
+.\}
+.nf
+Ftag::vared\-format
+`\-\- Ftag::map\-back
+.fi
+.if n \{\
+.RE
+.\}
+.sp
+Uses feature(s): \fIsetopt\fR
+.sp
+Not called by script or any function (may be e\&.g\&. a hook, a Zle widget, etc\&.)\&.
+.SS "Ftag::wutag"
+.sp
+.if n \{\
+.RS 4
+.\}
+.nf
+FUNCTION: Ftag::wutag [[[
+$1 = directory; $2 = filename; $3 = tag
+Option to use wutag alongside tag with \*(Aq\-w\*(Aq or wutag alone with \*(Aq\-ww\*(Aq
+.fi
+.if n \{\
+.RE
+.\}
+.sp
+Has 10 line(s)\&. Doesn\(cqt call other functions\&.
+.sp
+Called by:
+.sp
+.if n \{\
+.RS 4
+.\}
+.nf
+Script\-Body
+.fi
+.if n \{\
+.RE
+.\}
+.SS "Ftag::zoxide"
+.sp
+.if n \{\
+.RS 4
+.\}
+.nf
+SECTION: == Functions: Actions == [[[
+FUNCTION: Ftag::zoxide [[[
+Switch or query directory with zoxide
+.fi
+.if n \{\
+.RE
+.\}
+.sp
+Has 1 line(s)\&. Doesn\(cqt call other functions\&.
+.sp
+Not called by script or any function (may be e\&.g\&. a hook, a Zle widget, etc\&.)\&.
+.SS "Ftag::zstyle"
+.sp
+.if n \{\
+.RS 4
+.\}
+.nf
+FUNCTION: Ftag::zstyle [[[
+Wrapper function for zstyle
+.fi
+.if n \{\
+.RE
+.\}
+.sp
+Has 1 line(s)\&. Doesn\(cqt call other functions\&.
+.sp
+Uses feature(s): \fIzstyle\fR
+.sp
+Called by:
+.sp
+.if n \{\
+.RS 4
+.\}
+.nf
+Script\-Body
+.fi
+.if n \{\
+.RE
+.\}
+.SS "OS::notify"
+.sp
+.if n \{\
+.RS 4
+.\}
+.nf
+FUNCTION: OS::notify [[[
+TODO: add option to permanently set notifications
+.fi
+.if n \{\
+.RE
+.\}
+.sp
+Has 3 line(s)\&. Calls functions:
+.sp
+.if n \{\
+.RS 4
+.\}
+.nf
+OS::notify
+`\-\- Ftag::dep
+.fi
+.if n \{\
+.RE
+.\}
+.sp
+Called by:
+.sp
+.if n \{\
+.RS 4
+.\}
+.nf
+Ftag::copy::file
+Ftag::forgit
+Script\-Body
+.fi
+.if n \{\
+.RE
+.\}
