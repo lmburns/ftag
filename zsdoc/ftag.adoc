@@ -64,7 +64,7 @@ DETAILS
 Script Body
 ~~~~~~~~~~~
 
-Has 966 line(s). Calls functions:
+Has 972 line(s). Calls functions:
 
  Script-Body
  |-- +Ftag::msg
@@ -72,24 +72,32 @@ Has 966 line(s). Calls functions:
  |-- Ftag::copy::file
  |   |-- +Ftag::msg
  |   |-- Ftag::dep
+ |   |   `-- +Ftag::msg
  |   `-- OS::notify
  |       `-- Ftag::dep
+ |           `-- +Ftag::msg
  |-- Ftag::declare
  |-- Ftag::default_header
  |-- Ftag::dep
+ |   `-- +Ftag::msg
  |-- Ftag::dotbare
  |   |-- Ftag::dep
+ |   |   `-- +Ftag::msg
  |   `-- Ftag::is_git
  |-- Ftag::dua
  |   `-- Ftag::dep
+ |       `-- +Ftag::msg
  |-- Ftag::dust
  |   `-- Ftag::dep
+ |       `-- +Ftag::msg
  |-- Ftag::forgit
  |   |-- Ftag::is_git
  |   `-- OS::notify
  |       `-- Ftag::dep
+ |           `-- +Ftag::msg
  |-- Ftag::gitui
  |   `-- Ftag::dep
+ |       `-- +Ftag::msg
  |-- Ftag::glow
  |-- Ftag::gpg
  |-- Ftag::ini::read
@@ -128,6 +136,7 @@ Has 966 line(s). Calls functions:
  |-- Ftag::zstyle
  `-- OS::notify
      `-- Ftag::dep
+         `-- +Ftag::msg
 
 Uses feature(s): _export_, _read_, _setopt_, _trap_, _vared_, _zmodload_, _zparseopts_
 
@@ -151,6 +160,7 @@ Called by:
 
  Ftag::boxes
  Ftag::copy::file
+ Ftag::dep
  Ftag::dirstack
  Ftag::env_vars
  Ftag::ini::read
@@ -182,7 +192,6 @@ ____
  FUNCTION: Ftag::RG [[[
  Open directory and interactively search with ripgrep
  Default action is to open in editor
- TODO: add options to fzf
 ____
 
 Has 24 line(s). Doesn't call other functions.
@@ -244,7 +253,7 @@ ____
  $1 - Tag to color
 ____
 
-Has 7 line(s). Doesn't call other functions.
+Has 4 line(s). Doesn't call other functions.
 
 Uses feature(s): _setopt_
 
@@ -282,8 +291,10 @@ Has 55 line(s). Calls functions:
  Ftag::copy::file
  |-- +Ftag::msg
  |-- Ftag::dep
+ |   `-- +Ftag::msg
  `-- OS::notify
      `-- Ftag::dep
+         `-- +Ftag::msg
 
 Uses feature(s): _setopt_, _vared_
 
@@ -341,7 +352,10 @@ ____
  If '-e', will throw error
 ____
 
-Has 8 line(s). Doesn't call other functions.
+Has 8 line(s). Calls functions:
+
+ Ftag::dep
+ `-- +Ftag::msg
 
 Called by:
 
@@ -386,6 +400,7 @@ Has 17 line(s). Calls functions:
 
  Ftag::dotbare
  |-- Ftag::dep
+ |   `-- +Ftag::msg
  `-- Ftag::is_git
 
 Uses feature(s): _setopt_
@@ -407,6 +422,7 @@ Has 8 line(s). Calls functions:
 
  Ftag::dua
  `-- Ftag::dep
+     `-- +Ftag::msg
 
 Called by:
 
@@ -425,6 +441,7 @@ Has 8 line(s). Calls functions:
 
  Ftag::dust
  `-- Ftag::dep
+     `-- +Ftag::msg
 
 Called by:
 
@@ -463,6 +480,7 @@ Has 49 line(s). Calls functions:
  |-- Ftag::is_git
  `-- OS::notify
      `-- Ftag::dep
+         `-- +Ftag::msg
 
 Uses feature(s): _source_, _zle_, _zmodload_
 
@@ -498,6 +516,7 @@ Has 3 line(s). Calls functions:
 
  Ftag::gitui
  `-- Ftag::dep
+     `-- +Ftag::msg
 
 Called by:
 
@@ -619,7 +638,7 @@ ____
  $1 - File path to color and map to map hash
 ____
 
-Has 8 line(s). Doesn't call other functions.
+Has 6 line(s). Doesn't call other functions.
 
 Uses feature(s): _setopt_
 
@@ -737,7 +756,6 @@ ____
  
  FUNCTION: Ftag::path::find [[[
  Enter in custom path to switch directories
- TODO: create a prompt to switch paths
 ____
 
 Has 1 line(s). Doesn't call other functions.
@@ -769,7 +787,6 @@ ____
  
  FUNCTION: Ftag::tag [[[
  Tag wrapper to color the output
- TODO: add a header and column separator
  TODO: speed up
 ____
 
@@ -945,6 +962,7 @@ Has 3 line(s). Calls functions:
 
  OS::notify
  `-- Ftag::dep
+     `-- +Ftag::msg
 
 Called by:
 

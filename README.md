@@ -66,33 +66,48 @@ INSIDE FZF:
         Z       Switch to zoxide query to select path to list tags  ACTION_ZOXIDE
 ```
 
-### Environment Variables
+### Environment Variables and `zstyle`
+
+The following settings can be specified using environment variables, `zstyle`, or a configuration file located at `$XDG_CONFIG_HOME/ftag/config.ini`. An example configuration file that has all available settings can be generated using `-g` or `--genconfig`. The order of precedence in which the configuration can be specified are:
+
+1. The key-file specified with `zstyle ":ftag:" key-file <location>` or the variable `FTAG_KEYFILE`
+2. All `zstyle` specifications
+3. Environment variables
 
 #### `FTAG_PAGER`
-Pager to view the current file or to view the `fzf` usage keys within. The script sets it to `bat` and if `bat` is unavailable, then it uses `less`. If `vimpager`, `more`, etc. is your preference, then this environment variable can be set. The script works best with `bat` installed.
+Pager to be used throughout the script. The default is either `bat --paging=always -f` or `less`. (It works best with `bat` installed.)
+
+```sh
+zstyle ":ftag:" pager <cmd>
+```
 
 #### `FTAG_COPY`
 The copy command that is used to copy the path of the file to the clipboard. Since, as least for right now this is only applicable to `macOS`, this shouldn't be too much of a concern. The default is `pbcopy`; however, it still can be set to `xclip -sel primary` or `xsel -p`.
 
-#### `FTAG_MODIFIER`
-The modifier to bind keys with in `fzf`. The default is `ctrl`.
-
-#### `FTAG_ALT`
-The alt-key to bind with in `fzf`. The default is `alt`.
+```sh
+zstyle ":ftag:" copy-cmd <cmd>
+```
 
 ### `FTAG_FILEMANAGER`
-The file-manager to open the directory in using `F` within `fzf`. The defaults are set to `lf`, falling back to `ranger`, falling back to `xplr`. There are plans to add all the file managers so it will choose the first one it comes across. If you have more than one file-manager installed and do not like the one that is chosen, this environment variable can be set.
+The file-manager to open the directory where the file resides using `F` within `fzf`. The defaults are set to `lf`, falling back to `ranger`, falling back to `xplr`. There are plans to add all the file managers so it will choose the first one it comes across.
 
-#### `FTAG_FILE_PREV`
-The command to preview files with using `fzf`. The default is `bat --style=numbers --color=always`.
-Alternative method to specify the preview is: `zstyle ":ftag:" fzf-file-preview <prev_cmd>`.
+```sh
+zstyle ":ftag:" file-manager <cmd>
+```
 
-#### `FTAG_DIR_PREV`
-The command to preview directories with using `fzf`. The default is `exa -TL 3`.
-Alternative method to specify the preview is: `zstyle ":ftag:" fzf-dir-preview <prev_cmd>`
+### `FTAG_COLORS`
+A list of no more than 3 colors to be used in coloring `ftag`'s output. The first color specifies the tags, the second specifies the tag  separator, and the third specifies the color of the shortened `%DIR_MAP` array.
+
+```sh
+zstyle ":ftag:" colors <colors>
+```
 
 #### `FTAG_KEYFILE`
-File of keybinding configuration (`-g`|`--genconfig` will generate an example `$XDG_CONFIG_HOME/ftag/config`)
+File of keybinding configuration (`-g`|`--genconfig` will generate an example at `$XDG_CONFIG_HOME/ftag/config.ini`)
+
+```sh
+zstyle ":ftag:" key-file <file_path>
+```
 
 #### `FTAG_DIR_MAP`
 An array containing maps to directories for `ftag` to shorten. There are already several that are set. An array can be set in the format of:
@@ -105,7 +120,39 @@ An array containing maps to directories for `ftag` to shorten. There are already
 "$HOME/bin"             %XDG_BIN_HOME
 ```
 
-### `zstyle`
+There is no `zstyle` setting here. It can be specified in the key-file.
+
+#### `FTAG_FILE_PREV`
+The command to preview files with using `fzf`. The default is `bat --style=numbers --color=always`. There is no need to add empty brackets `{}` for `fzf`, it is added after the command is specified.
+
+```sh
+zstyle ":ftag:" fzf-file-preview <prev_cmd>
+```
+
+#### `FTAG_DIR_PREV`
+The command to preview directories with using `fzf`. The default is `exa -TL 3 --color=always --icons` and falls back to using `tree -L 3`.
+
+```sh
+zstyle ":ftag:" fzf-dir-preview <prev_cmd>
+```
+
+#### `FTAG_MODIFIER`
+The modifier to bind keys with in `fzf`. The default is `ctrl`.
+
+```sh
+zstyle ":ftag:" fzf-modifier <mod>
+```
+
+#### `FTAG_ALT`
+The alt-key to bind with in `fzf`. The default is `alt`.
+
+```sh
+zstyle ":ftag:" fzf-alt <alt>
+```
+
+**Note:** The keybindings specified in the keyfile will have the `fzf-alt`/`fzf-modifier` that is also specified in the keyfile applied to them. All other keybindings will respect `zstyle`'s specification or the associated environment variables.
+
+### `zstyle` only
 
 These are additional `zstyle` settings.
 
@@ -130,7 +177,7 @@ zstyle ":ftag:" fzf-bindings <bindings>
 The source code can be peeked at to see the ones already in use. This option is here in case any additional would like to be added.
 
 ```sh
-zstyle ":ftag:" fzf-flags
+zstyle ":ftag:" fzf-flags <flags>
 ```
 
 ## Installation
@@ -174,3 +221,11 @@ git clone https://github.com/lmburns/ftag <custom_location>
 # Add to .zshrc
 source ~/<custom_location>/ftag.plugin.zsh
 ```
+
+### TODO
+
+* Confirm support for file paths with spaces
+* Find a way to display hidden tagged files
+* Fix alignment if not part of mapping hash
+* Add option for tag separator symbol
+* Add option to permanently set notifications
