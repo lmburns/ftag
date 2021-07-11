@@ -2,12 +2,12 @@
 .\"     Title: ftag
 .\"    Author: [FIXME: author] [see http://www.docbook.org/tdg5/en/html/author]
 .\" Generator: DocBook XSL Stylesheets vsnapshot <http://docbook.sf.net/>
-.\"      Date: 07/09/2021
+.\"      Date: 07/10/2021
 .\"    Manual: \ \&
 .\"    Source: \ \&
 .\"  Language: English
 .\"
-.TH "FTAG" "1" "07/09/2021" "\ \&" "\ \&"
+.TH "FTAG" "1" "07/10/2021" "\ \&" "\ \&"
 .\" -----------------------------------------------------------------
 .\" * Define some portability stuff
 .\" -----------------------------------------------------------------
@@ -60,6 +60,7 @@ Ftag::format_length
 Ftag::gitui
 Ftag::glow
 Ftag::gpg
+Ftag::ini::read
 Ftag::is_git
 Ftag::lolcat
 Ftag::map\-back
@@ -76,6 +77,7 @@ Ftag::toilet
 Ftag::twf
 Ftag::usage
 Ftag::vared\-format
+Ftag::vared::formatter
 Ftag::wutag
 Ftag::zoxide
 Ftag::zstyle
@@ -87,7 +89,7 @@ OS::notify
 .SH "DETAILS"
 .SS "Script Body"
 .sp
-Has 807 line(s)\&. Calls functions:
+Has 966 line(s)\&. Calls functions:
 .sp
 .if n \{\
 .RS 4
@@ -119,6 +121,8 @@ Script\-Body
 |\ \&\ \& `\-\- Ftag::dep
 |\-\- Ftag::glow
 |\-\- Ftag::gpg
+|\-\- Ftag::ini::read
+|\ \&\ \& `\-\- +Ftag::msg
 |\-\- Ftag::is_git
 |\-\- Ftag::map\-back
 |\-\- Ftag::open::with
@@ -189,6 +193,7 @@ Ftag::boxes
 Ftag::copy::file
 Ftag::dirstack
 Ftag::env_vars
+Ftag::ini::read
 Ftag::lolcat
 Ftag::tag
 Ftag::toilet
@@ -325,7 +330,7 @@ $1 \- Tag to color
 .RE
 .\}
 .sp
-Has 4 line(s)\&. Doesn\(cqt call other functions\&.
+Has 7 line(s)\&. Doesn\(cqt call other functions\&.
 .sp
 Uses feature(s): \fIsetopt\fR
 .sp
@@ -422,7 +427,7 @@ Declare global variable for config
 .RE
 .\}
 .sp
-Has 9 line(s)\&. Doesn\(cqt call other functions\&.
+Has 13 line(s)\&. Doesn\(cqt call other functions\&.
 .sp
 Uses feature(s): \fIeval\fR
 .sp
@@ -829,6 +834,46 @@ Script\-Body
 .if n \{\
 .RE
 .\}
+.SS "Ftag::ini::read"
+.sp
+.if n \{\
+.RS 4
+.\}
+.nf
+FUNCTION: Ftag::ini::read [[[
+Taken from zdharma/fast\-syntax\-highlighting
+Parse configuration file
+.fi
+.if n \{\
+.RE
+.\}
+.sp
+Has 24 line(s)\&. Calls functions:
+.sp
+.if n \{\
+.RS 4
+.\}
+.nf
+Ftag::ini::read
+`\-\- +Ftag::msg
+.fi
+.if n \{\
+.RE
+.\}
+.sp
+Uses feature(s): \fIread\fR, \fIsetopt\fR
+.sp
+Called by:
+.sp
+.if n \{\
+.RS 4
+.\}
+.nf
+Script\-Body
+.fi
+.if n \{\
+.RE
+.\}
 .SS "Ftag::is_git"
 .sp
 .if n \{\
@@ -917,6 +962,7 @@ Called by:
 .\}
 .nf
 Ftag::vared\-format
+Ftag::vared::formatter
 Script\-Body
 .fi
 .if n \{\
@@ -935,7 +981,7 @@ $1 \- File path to color and map to map hash
 .RE
 .\}
 .sp
-Has 6 line(s)\&. Doesn\(cqt call other functions\&.
+Has 8 line(s)\&. Doesn\(cqt call other functions\&.
 .sp
 Uses feature(s): \fIsetopt\fR
 .sp
@@ -1177,7 +1223,7 @@ TODO: speed up
 .RE
 .\}
 .sp
-Has 241 line(s)\&. Calls functions:
+Has 238 line(s)\&. Calls functions:
 .sp
 .if n \{\
 .RS 4
@@ -1334,6 +1380,38 @@ Has 21 line(s)\&. Calls functions:
 .\}
 .nf
 Ftag::vared\-format
+`\-\- Ftag::map\-back
+.fi
+.if n \{\
+.RE
+.\}
+.sp
+Uses feature(s): \fIsetopt\fR
+.sp
+Not called by script or any function (may be e\&.g\&. a hook, a Zle widget, etc\&.)\&.
+.SS "Ftag::vared::formatter"
+.sp
+.if n \{\
+.RS 4
+.\}
+.nf
+FUNCTION: Ftag::vared::formatter [[[
+Display tags for \*(Aqvared\*(Aq in the main loop
+            
+ ❱ ❯  ⎣1⎤ ❪1❫ ⟦1⟧  ◂▸
+(\->|=>|→)
+.fi
+.if n \{\
+.RE
+.\}
+.sp
+Has 21 line(s)\&. Calls functions:
+.sp
+.if n \{\
+.RS 4
+.\}
+.nf
+Ftag::vared::formatter
 `\-\- Ftag::map\-back
 .fi
 .if n \{\

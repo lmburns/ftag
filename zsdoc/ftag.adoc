@@ -35,6 +35,7 @@ FUNCTIONS
  Ftag::gitui
  Ftag::glow
  Ftag::gpg
+ Ftag::ini::read
  Ftag::is_git
  Ftag::lolcat
  Ftag::map-back
@@ -51,6 +52,7 @@ FUNCTIONS
  Ftag::twf
  Ftag::usage
  Ftag::vared-format
+ Ftag::vared::formatter
  Ftag::wutag
  Ftag::zoxide
  Ftag::zstyle
@@ -62,7 +64,7 @@ DETAILS
 Script Body
 ~~~~~~~~~~~
 
-Has 807 line(s). Calls functions:
+Has 966 line(s). Calls functions:
 
  Script-Body
  |-- +Ftag::msg
@@ -90,6 +92,8 @@ Has 807 line(s). Calls functions:
  |   `-- Ftag::dep
  |-- Ftag::glow
  |-- Ftag::gpg
+ |-- Ftag::ini::read
+ |   `-- +Ftag::msg
  |-- Ftag::is_git
  |-- Ftag::map-back
  |-- Ftag::open::with
@@ -149,6 +153,7 @@ Called by:
  Ftag::copy::file
  Ftag::dirstack
  Ftag::env_vars
+ Ftag::ini::read
  Ftag::lolcat
  Ftag::tag
  Ftag::toilet
@@ -239,7 +244,7 @@ ____
  $1 - Tag to color
 ____
 
-Has 4 line(s). Doesn't call other functions.
+Has 7 line(s). Doesn't call other functions.
 
 Uses feature(s): _setopt_
 
@@ -295,7 +300,7 @@ ____
  Declare global variable for config
 ____
 
-Has 9 line(s). Doesn't call other functions.
+Has 13 line(s). Doesn't call other functions.
 
 Uses feature(s): _eval_
 
@@ -531,6 +536,27 @@ Called by:
 
  Script-Body
 
+Ftag::ini::read
+~~~~~~~~~~~~~~~
+
+____
+ 
+ FUNCTION: Ftag::ini::read [[[
+ Taken from zdharma/fast-syntax-highlighting
+ Parse configuration file
+____
+
+Has 24 line(s). Calls functions:
+
+ Ftag::ini::read
+ `-- +Ftag::msg
+
+Uses feature(s): _read_, _setopt_
+
+Called by:
+
+ Script-Body
+
 Ftag::is_git
 ~~~~~~~~~~~~
 
@@ -581,6 +607,7 @@ Uses feature(s): _setopt_
 Called by:
 
  Ftag::vared-format
+ Ftag::vared::formatter
  Script-Body
 
 Ftag::map-short
@@ -592,7 +619,7 @@ ____
  $1 - File path to color and map to map hash
 ____
 
-Has 6 line(s). Doesn't call other functions.
+Has 8 line(s). Doesn't call other functions.
 
 Uses feature(s): _setopt_
 
@@ -746,7 +773,7 @@ ____
  TODO: speed up
 ____
 
-Has 241 line(s). Calls functions:
+Has 238 line(s). Calls functions:
 
  Ftag::tag
  |-- +Ftag::msg
@@ -831,6 +858,27 @@ ____
 Has 21 line(s). Calls functions:
 
  Ftag::vared-format
+ `-- Ftag::map-back
+
+Uses feature(s): _setopt_
+
+Not called by script or any function (may be e.g. a hook, a Zle widget, etc.).
+
+Ftag::vared::formatter
+~~~~~~~~~~~~~~~~~~~~~~
+
+____
+ 
+ FUNCTION: Ftag::vared::formatter [[[
+ Display tags for 'vared' in the main loop
+             
+  ❱ ❯  ⎣1⎤ ❪1❫ ⟦1⟧  ◂▸
+ (->|=>|→)
+____
+
+Has 21 line(s). Calls functions:
+
+ Ftag::vared::formatter
  `-- Ftag::map-back
 
 Uses feature(s): _setopt_

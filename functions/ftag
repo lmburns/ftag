@@ -21,9 +21,9 @@ prog="${0:A:t}"   prog_dir="${0:A:h}"
 
 # TODO: find a way to display hidden tagged files
 # TODO: local reload errored out
-# TODO: custom color
 # TODO: fix alignment if not part of mapping hash
-  # FIX: try and cover all
+
+# TODO: add color to config
 # ]]] == END: Setup
 
 # SECTION: == Functions: Helper == [[[
@@ -85,14 +85,18 @@ function Ftag::is_git() { command git -C "${(z)@}" rev-parse --is-inside-work-tr
 # FUNCTION: Ftag::declare [[[
 # Declare global variable for config
 function Ftag::declare() {
+  integer prnt=0
+  [[ $1 = -X ]] && { prnt=1; shift; }
   [[ $1 = -* ]] && { local opt=$1; shift; }
   local -i set; set=$+parameters[${${(s:=:)@}[1]}]
   (( set )) || {
     [[ $opt = (#i)-a ]] && {
       eval "typeset -Hg${opt#-} ${${(s:=:)@}[1]}=${(fz)${(s:=:)@}[2]}"
     } || typeset -gH "${${(s:=:)@}[1]}=${${(s:=:)@}[2,-1]}"
-    return 0
+  (( prnt )) && print 0
+  return 0
   }
+  (( prnt )) && print 1
   return 1
 }
 # ]]]
@@ -102,7 +106,10 @@ function Ftag::declare() {
 function Ftag::color-tag() {
   builtin emulate -LR zsh
   setopt extendedglob typesetsilent rcquotes ${${${+REPLY}:#0}:+warncreateglobal}
-  REPLY="${1:+${FTAG[bmagen]}${${1//(#m)(\|)/${FTAG[blue]}${MATCH}${FTAG[res]}${FTAG[bmagen]}}}${FTAG[res]}}"
+  local __c1 __c2
+  [[ -n $color[1] ]] && __c1="${FTAG[$color[1]]}" || __c1="${FTAG[bmagen]}"
+  [[ -n $color[2] ]] && __c2="${FTAG[$color[2]]}" || __c2="${FTAG[blue]}"
+  REPLY="${1:+${__c1}${${1//(#m)(\|)/${__c2}${MATCH}${FTAG[res]}${__c1}}}${FTAG[res]}}"
   return 0
 }
 # ]]]
@@ -114,9 +121,10 @@ function Ftag::map-short() {
   setopt extendedglob typesetsilent noshortloops rcquotes
   typeset -gH SHORT
   local -a match mbegin mend
-  # Use 'O' as flag else use another array for $HOME becuase hash is unsorted
+  local __c3
+  [[ -n $color[3] ]] && __c3="${FTAG[$color[3]]}" || __c3="${FTAG[green]}"
   # Color: head
-  SHORT=${${1/(#b)(#s)(${(~j:|:)${(O@k)FTAG_DIR_MAP}}|)/${FTAG_DIR_MAP[$match[1]]:+${FTAG[green]}${FTAG_DIR_MAP[$match[1]]}${FTAG[res]}}}}
+  SHORT=${${1/(#b)(#s)(${(~j:|:)${(O@k)FTAG_DIR_MAP}}|)/${FTAG_DIR_MAP[$match[1]]:+${__c3}${FTAG_DIR_MAP[$match[1]]}${FTAG[res]}}}}
 
   # Color: head and tail
   # if [[ ${SHORT:h} != (${~SHORT:t}|\.) ]]; then
@@ -134,16 +142,47 @@ function Ftag::map-back() {
   builtin emulate -LR zsh
   setopt extendedglob typesetsilent rcquotes ${${${+reply}:#0}:+warncreateglobal}
   # typeset -ga reply; reply=()
-  local -a match mend mbegin opts
-  local f
+  local -a match mend mbegin
+  local __f
 
-  for f in "${@}"; do
-    if [[ "$f" = (#s)%* ]] {
-      reply=( ${${f/(#b)(#s)(${(~j:|:)${(@v)FTAG_DIR_MAP}}|)/${(~k)FTAG_DIR_MAP[(r)$match[1]]}}} )
+  for __f in "${@}"; do
+    if [[ "$__f" = (#s)%* ]] {
+      reply=( ${${__f/(#b)(#s)(${(~j:|:)${(@v)FTAG_DIR_MAP}}|)/${(~k)FTAG_DIR_MAP[(r)$match[1]]}}} )
     } else {
-      reply=( "$f" )
+      reply=( "$__f" )
     }
   done
+}
+# ]]]
+
+# FUNCTION: Ftag::ini::read [[[
+# Taken from zdharma/fast-syntax-highlighting
+# Parse configuration file
+function Ftag::ini::read() {
+  emulate -LR zsh
+  setopt extendedglob rcquotes warncreateglobal
+  local __ini_file="$1" __out_hash="${2:-INI}"
+  local IFS='' __line __cur_section="void" __access_string
+  local -a match mbegin mend
+
+  [[ ! -r "$__ini_file" ]] && {
+    +Ftag::msg "{err}$__ini_file is unreadable"
+    return 1
+  }
+
+  while read -r -t 1 __line; do
+    if [[ "$__line" = [[:blank:]]#\;* ]]; then
+      continue
+    elif [[ "$__line" = (#b)[[:blank:]]#\[([^\]]##)\][[:blank:]]# ]]; then
+      __cur_section="${match[1]}"
+    elif [[ "$__line" = (#b)[[:blank:]]#([^[:blank:]=]##)[[:blank:]]#[=][[:blank:]]#(*) ]]; then
+      match[2]="${match[2]%"${match[2]##*[! $'\t']}"}"
+      __access_string="${__out_hash}[<$__cur_section>_${match[1]}]"
+      : "${(P)__access_string::=${match[2]}}"
+    fi
+  done < "$__ini_file"
+
+  return 0
 }
 # ]]]
 
@@ -366,9 +405,6 @@ function Ftag::tag() {
     packs=( "${(on)packs[@]}" )
   elif [[ "${sort#-s}" = (++|d|desc) ]]; then
     packs=( "${(On)packs[@]}" )
-  else
-    +Ftag::msg "{warn}use 'd|desc|++' for descending; 'a|asc|+' for ascending"
-    exit 1 # Doesn't exit here
   fi
   }
 
@@ -527,17 +563,6 @@ function Ftag::format_length() {
   done
   REPLY="$answer"
   (( COLUMNS >= longest && count % 2 == 0 )) && REPLY="$REPLY"$'\n'
-}
-# ]]]
-
-# FUNCTION: Ftag::copy [[[
-# Determine copy command
-# TODO: use this or no?
-function Ftag::copy() {
-  if Ftag::dep "pbcopyy" ; then FTAG_COPY="pbcopy"
-  elif Ftag::dep "xclip" ; then FTAG_COPY="xclip -sel primary"
-  elif Ftag::dep "xsel"  ; then FTAG_COPY="xsel -p"
-  fi
 }
 # ]]]
 
@@ -768,7 +793,7 @@ function Ftag::twf() {
   builtin emulate -L zsh -o extendedglob -o noshortloops
   local -a opts
   local prev file
-  prev=${${(M)FTAG_PAGER:#bat*}:-cat}
+  prev=${${(M)__ftag[pager]:#bat*}:-cat}
   zparseopts -a opts -D ${(s::):-es}
   if (( ${+opts[(r)-e]} )); then
     file=$(twf -dir "${(z)@}" -previewCmd "${prev} {}")
@@ -799,9 +824,9 @@ function Ftag::dua() {
 function Ftag::dust() {
   builtin emulate -LR zsh
   if Ftag::dep "dust"; then
-    dust -d 1 "$@" | ${(z)FTAG_PAGER}
+    dust -d 1 "$@" | ${(z)__ftag[pager]}
   elif Ftag::dep "diskus"; then
-    diskus "$@" | ${(z)FTAG_PAGER}
+    diskus "$@" | ${(z)__ftag[pager]}
   else
     return 1
   fi
@@ -1001,12 +1026,12 @@ function Ftag::parse_format() {
 }
 # ]]]
 
-# FUNCTION: Ftag::vared-format [[[
+# FUNCTION: Ftag::vared::formatter [[[
 # Display tags for 'vared' in the main loop
 #             
 #  ❱ ❯  ⎣1⎤ ❪1❫ ⟦1⟧  ◂▸
 # (->|=>|→)
-function Ftag::vared-format() {
+function Ftag::vared::formatter() {
   builtin emulate -LR zsh
   setopt extendedglob noshortloops warncreateglobal
   integer adjusted i=1 max=0
@@ -1117,15 +1142,17 @@ __FTAG_OPTS=(
     "-z, --zoxide"         "Use zoxide to select directory to use tags (only shows tagged files)"
     "-j, --autojump"       "Use autojump to select directory to use tags (only shows tagged files)"
     "-b, --boxes"          "Add a box around header with boxes"
-    "-c, --lolcat"         "Color the header with lolcat"
+    "-T, --lolcat"         "Color the header with lolcat"
     "-t, --toilet"         "Color and format the header with toilet"
     "-l, --local"          "Use tag in a local directory"
     "-n, --nocolor"        "Don't use colored output"
+    "-C, --color <color>"  "Specify list of colors to use (use -C ls|list to list colors)"
     "-s, --sort"           "Sort desc with d|desc|++, sort ascending with a|asc|+"
     "-N, --nofzf"          "No fzf, however not a wrapper"
     "-W, --wrapper <cmds>" "No fzf, but is a wrapper and can use tag commands"
     "-f, --cfont <font>"   "Use custom font with figlet (some are provided)"
     "-h, --help"           "Display this help message"
+    "-c, --config <conf>"  "Specify configuration file"
     "-d, --dump"           "Dump configuration (mappings, actions, keyfile)"
     "-v, --verbose"        "Display verbosity (-vvv is max; only used with wrapper as of now)"
 )
@@ -1189,15 +1216,22 @@ __FTAG_ENVIRONVARS=(
     "zstyle ':ftag:' fzf-flags <flags>"             'Additional fzf flags to main command'
     "zstyle ':ftag:' fzf-file-preview <prev_cmd>"   'Alternative way to specify FTAG_FILE_PREV'
     "zstyle ':ftag:' fzf-dir-preview <prev_cmd>"    'Alternative way to specify FTAG_DIR_PREV'
+    "zstyle ':ftag:' fzf-modifier <mod>"            'Alternative way to specify FTAG_MODIFIER'
+    "zstyle ':ftag:' fzf-alt <alt>"                 'Alternative way to specify FTAG_ALT'
+    "zstyle ':ftag:' copy-cmd <cmd>"                'Alternative way to specify FTAG_COPY'
+    "zstyle ':ftag:' pager <cmd>"                   'Alternative way to specify FTAG_PAGER'
+    "zstyle ':ftag:' file-manager <fm>"             'Alternative way to specify FTAG_FILEMANAGER'
 )
 # ]]]
 
 # SECTION: == Imports / Setting Variables == [[[
 zmodload -Fa zsh/zutil b:zparseopts \
   || +Ftag::msg "{err}{green}zsh/zutil{res} is required to use this program{res}"
+
 # ${commands[@]} array
 zmodload -Fa zsh/parameter p:commands p:parameters \
   || +Ftag::msg "{err}{green}zsh/parameter{res} is requred to use this program{res}"
+
 # tput $COLUMNS
 zmodload zsh/terminfo 2>/dev/null
 zmodload zsh/termcap 2>/dev/null
@@ -1205,17 +1239,16 @@ zmodload zsh/termcap 2>/dev/null
 # a all = not used
 # Set query as optional args to prevent errors
 local -A opts
-local -a cfont sort wtag query verbose optpath
+local -a cfont sort wtag query verbose optpath color config
 typeset -gaH wrapper
 # FIX: error is never hit
-zparseopts -D -A opts h -help b -boxes c -lolcat t -toilet g -genconfig \
+zparseopts -D -A opts h -help b -boxes T -lolcat t -toilet g -genconfig \
     l -local z -zoxide j -jump n -nocolor N -nofzf d -dump {W,-wrapper}:=wrapper \
-    {f,-font}::=cfont {p,-path}:=optpath {q,-query}::=query \
-    {w,-wutag}+=wtag {s,-sort}::=sort {v,-verbose}+=verbose || {
+    {f,-font}::=cfont {p,-path}:=optpath {q,-query}::=query {C,-color}:=color \
+    {c,-config}:=config {w,-wutag}+=wtag {s,-sort}::=sort {v,-verbose}+=verbose || {
       Ftag::usage; exit 1;
     }
 
-# colors=(); fg=(); bg=(); fg_bold=(); bg_bold=(); reset_color=""
 typeset -gAH FTAG
 FTAG=(
   red    $'\e[38;5;1m'  bred   $'\e[01;31m' brred   $'\e[38;5;9m'
@@ -1228,8 +1261,9 @@ FTAG=(
   tb     $' \t '        nl     $'\n'
 )
 
-# TODO: add usage
-# local -A colors fg bg fg_bold bg_bold
+# ??
+local -A colors fg bg fg_bold bg_bold fg_no_bold
+# colors=(); fg=(); bg=(); fg_bold=(); bg_bold=(); reset_color=""
 # autoload colors
 # colors
 typeset -gAH __FTAG_ANSI
@@ -1240,7 +1274,13 @@ __FTAG_ANSI=(
   blue  "$fg_no_bold[blue]"    bblue  "$fg_bold[blue]"    bgblue  "$bg[blue]"
   magen "$fg_no_bold[magenta]" bmagen "$fg_bold[magenta]" bgmagen "$bg[magenta]"
   cyan  "$fg_no_bold[cyan]"    bcyan  "$fg_bold[cyan]"    bgcyan  "$bg[cyan]"
+  res   "$reset_color"
 )
+
+Ftag::opts "h help" && {
+  Ftag::usage
+  exit 0
+}
 
 # Has to be global when program is sourced on second loop
 typeset -gH FZFTAG_QUERY
@@ -1252,17 +1292,42 @@ typeset -gH FZFTAG_PATH
 FZFTAG_PATH=${${${(@)optpath##-(p|-path(=|))}[-1]//=/}:-} # fzf path
 export FZFTAG_PATH
 
+local conf
+conf=${${~${${config##-(c|-config(=|))}[-1]//=/}}:-}
+
+sort=${${${sort##-(s|-sort(=|))}[-1]//=/}:-}
+[[ -n $sort && $sort != (+|a|asc|++|d|desc) ]] && {
+  +Ftag::msg "{err}sorting must be (+|a|asc) for ascending or (++|d|desc) for descending"
+  exit 1
+}
+
+color=( ${${(@s:,:)${${(A@)color##-(C|-color(=|))}[-1]//=/}}:-} )
+[[ $color = (ls|list) ]] && {
+  for k ( "${(@kon)FTAG[(I)^(und|bold|res|tb|nl)]}" ); do
+    local i=$FTAG[$k]
+    print "${FTAG[res]}${(r:14:: :):-$k:} $i###########"
+  done && exit 0
+# } elif (( $#color > 2 )) {
+#   +Ftag::msg "{err}cannot list more than 2 colors"; exit 0
+}
+
+integer csize=$#color
+color=( ${(M)color:#${(~j:|:)${(@k)FTAG[(I)(^und|bold|res|tb|nl)]}}} )
+(( $#color != $csize )) && { +Ftag::msg "{err}invalid color specified"; exit 1; }
+(( $#color > 3 ))       && {
+  +Ftag::msg "{err}specify only 3 colors." \
+      "{nl}Color 1 = tags" \
+      "{nl}Color 2 = tag separator" \
+      "{nl}Color 3 = %DIR_MAP shortener"
+  exit 1
+}
+
 typeset -g +h LESS
 local space
 space="[[:space:]]#"
 # Prevent -r from being added twice; -F prevents paging if less than screen size
 LESS=${(j. .)${${(@)${(s: :)LESS}}//(${~space}-r${~space}|${~space}-F${~space})/}}
 export LESS="-r $LESS"
-
-Ftag::opts "h help" && {
-  Ftag::usage
-  exit 0
-}
 
 # Add path before starting to check dependencies
 (( ! ${path[(I)/usr/local/bin]} )) && {
@@ -1281,12 +1346,6 @@ Ftag::dep "figlet" && figlet="figlet" || figlet="cat"
 # ]]] == END: Setting Variables
 
 # SECTION: == Config == [[[
-Ftag::declare "FTAG_PAGER=${${${commands[bat]}:+bat --paging=always -f}:-less}"
-Ftag::declare "FTAG_FILEMANAGER=${commands[lf]:-${commands[ranger]}:-${commands[xplr]}}"
-Ftag::declare "FTAG_MODIFIER=ctrl"
-Ftag::declare "FTAG_ALT=alt"
-Ftag::declare "FTAG_COPY=pbcopy"
-
 Ftag::declare -A '\
   FTAG_DIR_MAP=(
     "$HOME/.config/zsh"     %ZDOTDIR
@@ -1296,7 +1355,7 @@ Ftag::declare -A '\
     "$HOME/bin"             %XDG_BIN_HOME
     "$HOME/ghq"             %GHQ
     "$HOME/github"          %GITHUB
-    "$HOME/projects/github" %GITHUB
+    "$HOME/projects/github" %PR_GITHUB
     "$HOME/Downloads"       %DOWNLOADS
     "$HOME/Documents"       %DOCUMENTS
     "$HOME/Desktop"         %DESKTOP
@@ -1316,110 +1375,6 @@ readonly FTAG_INTERNAL="+reload(env _FZFTAG_INTERNAL=reload $prog)"
 readonly FTAG_RELOAD="+reload(env _FZFTAG_RELOAD=true $prog)"
 readonly FTAG_CHPROMPT="+change-prompt"
 
-# Fzf reloads automatically when locally searching
-# However global requires a manual reload unless you wait just a second
-# The redirection, reload, and print seems to help some
-
-# Ftag::tag "${(z)${(@f)"$(<$current_filter)"}}"
-
-typeset -gA FTAG_ACTIONS
-: ${FTAG_ACTIONS[ACTION_ADD]:=execute(env FZFTAG_ACTION=add "$prog" \{+f\} "${(z)TTY_REDIRECTION}")"${(z)FTAG_RELOAD}"}
-: ${FTAG_ACTIONS[ACTION_SET]:=execute(env FZFTAG_ACTION=set "$prog" \{+f\} "${(z)TTY_REDIRECTION}")"${(z)FTAG_RELOAD}"}
-: ${FTAG_ACTIONS[ACTION_EDIT]:=execute(env FZFTAG_ACTION=edit "$prog" \{+f\} "${(z)TTY_REDIRECTION}")"${(z)FTAG_RELOAD}"}
-: ${FTAG_ACTIONS[ACTION_REMOVE]:=execute(env FZFTAG_ACTION=remove "$prog" \{+f\} "${(z)TTY_REDIRECTION}")"${(z)FTAG_RELOAD}"}
-: ${FTAG_ACTIONS[ACTION_VITAG]:=execute(env FZFTAG_ACTION=vitag "$prog" \{+f\} "${(z)TTY_REDIRECTION}")"${(z)FTAG_PRINT}"}
-: ${FTAG_ACTIONS[ACTION_USAGE]:=execute(env FZFTAG_ACTION=usage "$prog" \{+f\} "${(z)TTY_REDIRECTION}")"${(z)FTAG_PRINT}"}
-
-: ${FTAG_ACTIONS[ACTION_COPY_FILE]:=execute(env FZFTAG_ACTION=copy-file "$prog" \{+f\} "${(z)TTY_REDIRECTION}")"${(z)FTAG_PRINT}"}
-: ${FTAG_ACTIONS[ACTION_FINDER]:=execute(env FZFTAG_ACTION=open-finder "$prog" \{+f\} "${(z)TTY_REDIRECTION}")"${(z)FTAG_PRINT}"}
-: ${FTAG_ACTIONS[ACTION_OPEN]:=execute(env FZFTAG_ACTION=open "$prog" \{+f\} "${(z)TTY_REDIRECTION}")"${(z)FTAG_PRINT}"}
-: ${FTAG_ACTIONS[ACTION_OPEN_WITH]:=execute(env FZFTAG_ACTION=open-with "$prog" \{+f\} "${(z)TTY_REDIRECTION}")"${(z)FTAG_PRINT}"}
-: ${FTAG_ACTIONS[ACTION_VIEW]:=execute(env FZFTAG_ACTION=bat-view "$prog" \{+f\})}
-: ${FTAG_ACTIONS[ACTION_EXTERNALVIEW]:=execute(env FZFTAG_ACTION=external-view "$prog" \{+f\})}
-: ${FTAG_ACTIONS[ACTION_COPY]:=execute-silent(env FZFTAG_ACTION=copy "$prog" \{+f\})}
-: ${FTAG_ACTIONS[ACTION_DELETE]:=execute(env FZFTAG_ACTION=delete "$prog" \{+f\} "${(z)TTY_REDIRECTION}")"${(z)FTAG_PRINT}"}
-: ${FTAG_ACTIONS[ACTION_FILEMANAGER]:=execute(env FZFTAG_ACTION=file-manager "$prog" \{+f\} "${(z)TTY_REDIRECTION}")"${(z)FTAG_PRINT}"}
-
-: ${FTAG_ACTIONS[ACTION_GIT]:=execute(env FZFTAG_ACTION=git "$prog" \{+f\} "${(z)TTY_REDIRECTION}")"${(z)FTAG_PRINT}"}
-: ${FTAG_ACTIONS[ACTION_GPG_EDIT]:=execute(env FZFTAG_ACTION=gpg-edit "$prog" \{+f\} "${(z)TTY_REDIRECTION}")"${(z)FTAG_PRINT}"}
-: ${FTAG_ACTIONS[ACTION_GPG]:=execute(env FZFTAG_ACTION=gpg "$prog" \{+f\} "${(z)TTY_REDIRECTION}")"${(z)FTAG_PRINT}"}
-: ${FTAG_ACTIONS[ACTION_DUA]:=execute(env FZFTAG_ACTION=dua "$prog" \{+f\} "${(z)TTY_REDIRECTION}")"${(z)FTAG_PRINT}"}
-: ${FTAG_ACTIONS[ACTION_DUST]:=execute(env FZFTAG_ACTION=dust "$prog" \{+f\} "${(z)TTY_REDIRECTION}")"${(z)FTAG_PRINT}"}
-: ${FTAG_ACTIONS[ACTION_TWF_EDIT]:=execute(env FZFTAG_ACTION=twf-edit "$prog" \{+f\} "${(z)TTY_REDIRECTION}")"${(z)FTAG_PRINT}"}
-: ${FTAG_ACTIONS[ACTION_RIPGREP]:=execute(env FZFTAG_ACTION=ripgrep "$prog" \{+f\} "${(z)TTY_REDIRECTION}")"${(z)FTAG_PRINT}"}
-: ${FTAG_ACTIONS[ACTION_FORGIT]:=execute(env FZFTAG_ACTION=forgit "$prog" \{+f\} "${(z)TTY_REDIRECTION}")"${(z)FTAG_PRINT}"}
-: ${FTAG_ACTIONS[ACTION_DOTBARE]:=execute(env FZFTAG_ACTION=dotbare "$prog" \{+f\} "${(z)TTY_REDIRECTION}")"${(z)FTAG_PRINT}"}
-: ${FTAG_ACTIONS[ACTION_GLOW]:=execute(env FZFTAG_ACTION=glow "$prog" \{+f\} "${(z)TTY_REDIRECTION}")"${(z)FTAG_PRINT}"}
-: ${FTAG_ACTIONS[ACTION_FFSEND]:=execute(env FZFTAG_ACTION=ffsend "$prog" \{+f\} "${(z)TTY_REDIRECTION}")"${(z)FTAG_PRINT}"}
-: ${FTAG_ACTIONS[ACTION_TOKEI]:=execute(env FZFTAG_ACTION=tokei "$prog" \{+f\} "${(z)TTY_REDIRECTION}")"${(z)FTAG_PRINT}"}
-: ${FTAG_ACTIONS[ACTION_DRAGON_SOURCE]:=execute(env FZFTAG_ACTION=dragon-source "$prog" \{+f\} "${(z)TTY_REDIRECTION}")"${(z)FTAG_PRINT}"}
-
-: ${FTAG_ACTIONS[ACTION_DIRSTACK]:=execute(env FZFTAG_STATE_CHANGE=dirstack "$prog" )"${(z)FTAG_INTERNAL}${FTAG_CHPROMPT}"( Dirstack Tag> )}
-: ${FTAG_ACTIONS[ACTION_LOCAL]:=execute(env FZFTAG_STATE_CHANGE=local "$prog" )"${(z)FTAG_INTERNAL}${FTAG_CHPROMPT}"( Local Tag> )}
-: ${FTAG_ACTIONS[ACTION_PATH]:=execute(env FZFTAG_STATE_CHANGE=path "$prog" )"${(z)FTAG_INTERNAL}${FTAG_CHPROMPT}"( Path Tag> )}
-: ${FTAG_ACTIONS[ACTION_GLOBAL]:=execute(env FZFTAG_STATE_CHANGE=global "$prog" )"${(z)FTAG_INTERNAL}${FTAG_CHPROMPT}"( Global Tag> )}
-: ${FTAG_ACTIONS[ACTION_ZOXIDE]:=execute(env FZFTAG_STATE_CHANGE=zoxide "$prog" )"${(z)FTAG_INTERNAL}${FTAG_CHPROMPT}"( Zoxide Tag> )}
-: ${FTAG_ACTIONS[ACTION_AUTOJUMP]:=execute(env FZFTAG_STATE_CHANGE=autojump "$prog" )"${(z)FTAG_INTERNAL}${FTAG_CHPROMPT}"( Jump Tag> )}
-
-: ${FTAG_ACTIONS[ACTION_RELOAD]:=reload(env _FZFTAG_INTERNAL=reload "$prog")}
-: ${FTAG_ACTIONS[ACTION_PREVIEW]:=toggle-preview}
-: ${FTAG_ACTIONS[ACTION_HELP]:=execute(env _FZFTAG_SHOW=keys "$prog" | "${(z)FTAG_PAGER}" )"${(z)FTAG_PRINT}"}
-: ${FTAG_ACTIONS[ACTION_QUIT]:=abort}
-
-: ${FTAG_ACTIONS[ACTION_TOGGLE_DOWN]:=toggle+down}
-: ${FTAG_ACTIONS[ACTION_TEST]:=execute(env FZFTAG_ACTION=test "$prog" \{+f\} "${(z)TTY_REDIRECTION}")"${(z)FTAG_PRINT}"}
-: ${FTAG_ACTIONS[ACTION_TWF_SWITCH]:=execute(env FZFTAG_STATE_CHANGE=twf-switch "$prog" )"${(z)FTAG_RELOAD}${FTAG_CHPROMPT}"(TWF Tag>)}
-
-# TODO: create page explaining fzf executes to allow these; use default bindings
-# builtin zstyle ":ftag:*" bindings default
-typeset -gA FTAG_KEYBINDINGS
-: ${FTAG_KEYBINDINGS[T]:=$FTAG_ACTIONS[ACTION_TEST]}
-
-: ${FTAG_KEYBINDINGS[A]:=$FTAG_ACTIONS[ACTION_ADD]}
-: ${FTAG_KEYBINDINGS[S]:=$FTAG_ACTIONS[ACTION_SET]}
-: ${FTAG_KEYBINDINGS[E]:=$FTAG_ACTIONS[ACTION_EDIT]}
-: ${FTAG_KEYBINDINGS[D]:=$FTAG_ACTIONS[ACTION_REMOVE]}
-: ${FTAG_KEYBINDINGS[U]:=$FTAG_ACTIONS[ACTION_USAGE]}
-: ${FTAG_KEYBINDINGS[${FTAG_ALT}-t]:=$FTAG_ACTIONS[ACTION_VITAG]}
-
-: ${FTAG_KEYBINDINGS[F]:=$FTAG_ACTIONS[ACTION_FILEMANAGER]}
-: ${FTAG_KEYBINDINGS[I]:=$FTAG_ACTIONS[ACTION_GIT]}
-: ${FTAG_KEYBINDINGS[${FTAG_MODIFIER}-s]:=$FTAG_ACTIONS[ACTION_DIRSTACK]}
-: ${FTAG_KEYBINDINGS[${FTAG_MODIFIER}-b]:=$FTAG_ACTIONS[ACTION_DOTBARE]}
-: ${FTAG_KEYBINDINGS[${FTAG_MODIFIER}-f]:=$FTAG_ACTIONS[ACTION_FORGIT]}
-: ${FTAG_KEYBINDINGS[${FTAG_MODIFIER}-e]:=$FTAG_ACTIONS[ACTION_GPG_EDIT]}
-: ${FTAG_KEYBINDINGS[${FTAG_MODIFIER}-g]:=$FTAG_ACTIONS[ACTION_GPG]}
-: ${FTAG_KEYBINDINGS[${FTAG_ALT}-c]:=$FTAG_ACTIONS[ACTION_COPY_FILE]}
-: ${FTAG_KEYBINDINGS[${FTAG_MODIFIER}-d]:=$FTAG_ACTIONS[ACTION_DUA]}
-: ${FTAG_KEYBINDINGS[${FTAG_ALT}-s]:=$FTAG_ACTIONS[ACTION_DUST]}
-: ${FTAG_KEYBINDINGS[${FTAG_MODIFIER}-t]:=$FTAG_ACTIONS[ACTION_TWF_EDIT]}
-: ${FTAG_KEYBINDINGS[${FTAG_MODIFIER}-r]:=$FTAG_ACTIONS[ACTION_RIPGREP]}
-: ${FTAG_KEYBINDINGS[${FTAG_MODIFIER}-o]:=$FTAG_ACTIONS[ACTION_FINDER]}
-: ${FTAG_KEYBINDINGS[${FTAG_MODIFIER}-w]:=$FTAG_ACTIONS[ACTION_GLOW]}
-: ${FTAG_KEYBINDINGS[${FTAG_ALT}-i]:=$FTAG_ACTIONS[ACTION_TOKEI]}
-: ${FTAG_KEYBINDINGS[${FTAG_ALT}-f]:=$FTAG_ACTIONS[ACTION_FFSEND]}
-: ${FTAG_KEYBINDINGS[${FTAG_ALT}-p]:=$FTAG_ACTIONS[ACTION_DRAGON_SOURCE]}
-: ${FTAG_KEYBINDINGS[O]:=$FTAG_ACTIONS[ACTION_OPEN]}
-: ${FTAG_KEYBINDINGS[${FTAG_ALT}-w]:=$FTAG_ACTIONS[ACTION_OPEN_WITH]}
-: ${FTAG_KEYBINDINGS[${FTAG_ALT}-d]:=$FTAG_ACTIONS[ACTION_DELETE]}
-: ${FTAG_KEYBINDINGS[${FTAG_MODIFIER}-p]:=$FTAG_ACTIONS[ACTION_PATH]}
-: ${FTAG_KEYBINDINGS[L]:=$FTAG_ACTIONS[ACTION_LOCAL]}
-: ${FTAG_KEYBINDINGS[G]:=$FTAG_ACTIONS[ACTION_GLOBAL]}
-: ${FTAG_KEYBINDINGS[Z]:=$FTAG_ACTIONS[ACTION_ZOXIDE]}
-: ${FTAG_KEYBINDINGS[J]:=$FTAG_ACTIONS[ACTION_AUTOJUMP]}
-: ${FTAG_KEYBINDINGS[${FTAG_MODIFIER}-y]:=${(z)FTAG_ACTIONS[ACTION_COPY]}}
-: ${FTAG_KEYBINDINGS[V]:=$FTAG_ACTIONS[ACTION_VIEW]}
-: ${FTAG_KEYBINDINGS[${FTAG_MODIFIER}-v]:=$FTAG_ACTIONS[ACTION_EXTERNALVIEW]}
-
-: ${FTAG_KEYBINDINGS[R]:=$FTAG_ACTIONS[ACTION_RELOAD]}
-: ${FTAG_KEYBINDINGS[P]:=$FTAG_ACTIONS[ACTION_PREVIEW]}
-: ${FTAG_KEYBINDINGS[Q]:=$FTAG_ACTIONS[ACTION_QUIT]}
-: ${FTAG_KEYBINDINGS[esc]:=$FTAG_ACTIONS[ACTION_QUIT]}
-: ${FTAG_KEYBINDINGS[?]:=$FTAG_ACTIONS[ACTION_HELP]}
-
-# : ${FTAG_KEYBINDINGS[${FTAG_MODIFIER}-s]:=$FTAG_ACTIONS[ACTION_TWF_SWITCH]}
-
-
 () {
   builtin emulate -LR zsh
   setopt nullglob noksharrays extendedglob typesetsilent warncreateglobal
@@ -1427,87 +1382,305 @@ typeset -gA FTAG_KEYBINDINGS
   zmodload -Fa zsh/zutil b:zstyle
   local kf keyfile bind fzf_flags ph
   typeset -gHA __ftag
-  typeset -gx FTAG_FILE_PREV FTAG_DIR_PREV FTAG_KEYFILE
+  typeset -gx FTAG_FILE_PREV FTAG_DIR_PREV FTAG_KEYFILE FTAG_COPY FTAG_MODIFIER FTAG_ALT
+
   # print -- ${${jobstates[(R)running:*]/#*:/}/%=*/}
 
-  keyfile="${XDG_CONFIG_HOME:-$HOME/.config}/ftag/config"
+  keyfile="${XDG_CONFIG_HOME:-$HOME/.config}/ftag/config.ini"
   __ftag[extra_binds]="alt-shift-down:preview-down,alt-shift-up:preview-up"
 
   # local cf
   # local lastcache_file="${TMPDIR:-/tmp}/ftag_lastcache"
   # [[ -f $lastcache_file ]] && __ftag[lastcache]="$(<$lastcache_file)" || __ftag[lastcache]=0
 
-  # Ftag::declare "FTAG_FILE_PREV=bat --style=numbers --color=always"
-  # Ftag::declare "FTAG_DIR_PREV=exa -TL 3"
-
-  # Ftag::zstyle -s fzf-bindings ${ph::=__ftag[extra_binds]}  || : ${__ftag[extra_binds]::=}
-  # Ftag::zstyle -s fzf-flags ${ph::=__ftag[fzf_flags]}       || : ${__ftag[fzf_flags]::=}
-
+  # Precedence of configuration
+  # key-file | FTAG_KEYFILE => zstyle => environment variables
   Ftag::zstyle -s fzf-command       ${ph::=__ftag[fzf_command]} || : ${__ftag[fzf_command]::=fzf}
   Ftag::zstyle -a fzf-bindings      bind                        && __ftag[extra_binds]+=,${(j:,:)bind}
   Ftag::zstyle -a fzf-flags         fzf_flags                   && : ${__ftag[fzf_flags]::=${(j: :)fzf_flags}}
-  Ftag::zstyle -s fzf-file-preview ${ph::=__ftag[prev]}         || : ${__ftag[file_prev]::=${FTAG_FILE_PREV:=bat --style=numbers --color=always}}
-  Ftag::zstyle -s fzf-dir-preview  ${ph::=__ftag[dir_prev]}     || : ${__ftag[dir_prev]::=${FTAG_DIR_PREV:=exa -TL 3}}
-  Ftag::zstyle -s key-file         ${kf::=__ftag[keyfile]}      || : ${__ftag[keyfile]::=${FTAG_KEYFILE:=${0:A:h}/ftag}}
 
-  # $0 here is (anon)
-  # Ftag::zstyle -s key-file ${kf::=__ftag[keyfile]} || {
-  #   ! Ftag::declare "FTAG_KEYFILE=$keyfile" && __ftag[keyfile]=$FTAG_KEYFILE || {
-  #     __ftag[keyfile]="${0:A:h}/ftag"
-  #   }
-  # }
+  Ftag::zstyle -s fzf-file-preview ${ph::=__ftag[file_prev]} || : ${__ftag[file_prev]::=${FTAG_FILE_PREV:-bat --style=numbers --color=always}}
+  Ftag::zstyle -s fzf-dir-preview  ${ph::=__ftag[dir_prev]}  || : ${__ftag[dir_prev]::=${FTAG_DIR_PREV:-exa -TL 3}}
+  Ftag::zstyle -s fzf-modifier     ${ph::=__ftag[fzf_mod]}   || : ${__ftag[fzf_mod]::=${FTAG_MODIFIER:-ctrl}}
+  Ftag::zstyle -s fzf-alt          ${ph::=__ftag[fzf_alt]}   || : ${__ftag[fzf_alt]::=${FTAG_ALT:-alt}}
+  Ftag::zstyle -s copy-cmd         ${ph::=__ftag[copy_cmd]}  || : ${__ftag[copy_cmd]::=${FTAG_COPY:-pbcopy}}
+  Ftag::zstyle -s pager            ${ph::=__ftag[pager]}     || : ${__ftag[pager]::=${FTAG_PAGER:-${${${commands[bat]}:+bat --paging=always -f}:-less}}}
+  Ftag::zstyle -s file-manager     ${ph::=__ftag[fmngr]}     || : ${__ftag[fmngr]::=${FTAG_FILEMANAGER:-${commands[lf]:-${commands[ranger]}:-${commands[xplr]}}}}
+  Ftag::zstyle -s key-file         ${kf::=__ftag[keyfile]}   || : ${__ftag[keyfile]::=${FTAG_KEYFILE:-${0:A:h}/ftag}}
 
-  [[ $~__ftag[keyfile] != "${0:A:h}/ftag" && -f $~__ftag[keyfile] ]] && {
-    local -a kf_cont=( ${${(@f)~~"$(<$__ftag[keyfile])"}%%(\#|\)|type)*} )
-    integer mark=0
-    local f; for f ($ff) {
-      if [[ $f = "FTAG_ACTIONS=(" ]] { mark=1 && continue }
-      if (( mark != 1 )) {
-        FTAG_KEYBINDINGS[${${${(s:' ':)f}[1]}//\'/}]=${(qq)${${${(s:' ':)f}[2]}//\'}}
-      } else {
-        FTAG_ACTIONS[${${${(s:' ':)f}[1]}//\'/}]=${(qq)${${${(s:' ':)f}[2]}//\'}}
+  # CLI specification trumps zstyle
+  [[ -n "$conf" ]] && __ftag[keyfile]="$conf"
+
+  # Fzf reloads automatically when locally searching
+  # However global requires a manual reload unless you wait just a second
+  # The redirection, reload, and print seems to help some
+
+  typeset -gA FTAG_ACTIONS
+  : ${FTAG_ACTIONS[ACTION_ADD]:=execute(env FZFTAG_ACTION=add "$prog" \{+f\} "${(z)TTY_REDIRECTION}")"${(z)FTAG_RELOAD}"}
+  : ${FTAG_ACTIONS[ACTION_SET]:=execute(env FZFTAG_ACTION=set "$prog" \{+f\} "${(z)TTY_REDIRECTION}")"${(z)FTAG_RELOAD}"}
+  : ${FTAG_ACTIONS[ACTION_EDIT]:=execute(env FZFTAG_ACTION=edit "$prog" \{+f\} "${(z)TTY_REDIRECTION}")"${(z)FTAG_RELOAD}"}
+  : ${FTAG_ACTIONS[ACTION_REMOVE]:=execute(env FZFTAG_ACTION=remove "$prog" \{+f\} "${(z)TTY_REDIRECTION}")"${(z)FTAG_RELOAD}"}
+  : ${FTAG_ACTIONS[ACTION_VITAG]:=execute(env FZFTAG_ACTION=vitag "$prog" \{+f\} "${(z)TTY_REDIRECTION}")"${(z)FTAG_PRINT}"}
+  : ${FTAG_ACTIONS[ACTION_USAGE]:=execute(env FZFTAG_ACTION=usage "$prog" \{+f\} "${(z)TTY_REDIRECTION}")"${(z)FTAG_PRINT}"}
+
+  : ${FTAG_ACTIONS[ACTION_COPY_FILE]:=execute(env FZFTAG_ACTION=copy-file "$prog" \{+f\} "${(z)TTY_REDIRECTION}")"${(z)FTAG_PRINT}"}
+  : ${FTAG_ACTIONS[ACTION_FINDER]:=execute(env FZFTAG_ACTION=open-finder "$prog" \{+f\} "${(z)TTY_REDIRECTION}")"${(z)FTAG_PRINT}"}
+  : ${FTAG_ACTIONS[ACTION_OPEN]:=execute(env FZFTAG_ACTION=open "$prog" \{+f\} "${(z)TTY_REDIRECTION}")"${(z)FTAG_PRINT}"}
+  : ${FTAG_ACTIONS[ACTION_OPEN_WITH]:=execute(env FZFTAG_ACTION=open-with "$prog" \{+f\} "${(z)TTY_REDIRECTION}")"${(z)FTAG_PRINT}"}
+  : ${FTAG_ACTIONS[ACTION_VIEW]:=execute(env FZFTAG_ACTION=bat-view "$prog" \{+f\})}
+  : ${FTAG_ACTIONS[ACTION_EXTERNALVIEW]:=execute(env FZFTAG_ACTION=external-view "$prog" \{+f\})}
+  : ${FTAG_ACTIONS[ACTION_COPY]:=execute-silent(env FZFTAG_ACTION=copy "$prog" \{+f\})}
+  : ${FTAG_ACTIONS[ACTION_DELETE]:=execute(env FZFTAG_ACTION=delete "$prog" \{+f\} "${(z)TTY_REDIRECTION}")"${(z)FTAG_PRINT}"}
+  : ${FTAG_ACTIONS[ACTION_FILEMANAGER]:=execute(env FZFTAG_ACTION=file-manager "$prog" \{+f\} "${(z)TTY_REDIRECTION}")"${(z)FTAG_PRINT}"}
+
+  : ${FTAG_ACTIONS[ACTION_GIT]:=execute(env FZFTAG_ACTION=git "$prog" \{+f\} "${(z)TTY_REDIRECTION}")"${(z)FTAG_PRINT}"}
+  : ${FTAG_ACTIONS[ACTION_GPG_EDIT]:=execute(env FZFTAG_ACTION=gpg-edit "$prog" \{+f\} "${(z)TTY_REDIRECTION}")"${(z)FTAG_PRINT}"}
+  : ${FTAG_ACTIONS[ACTION_GPG]:=execute(env FZFTAG_ACTION=gpg "$prog" \{+f\} "${(z)TTY_REDIRECTION}")"${(z)FTAG_PRINT}"}
+  : ${FTAG_ACTIONS[ACTION_DUA]:=execute(env FZFTAG_ACTION=dua "$prog" \{+f\} "${(z)TTY_REDIRECTION}")"${(z)FTAG_PRINT}"}
+  : ${FTAG_ACTIONS[ACTION_DUST]:=execute(env FZFTAG_ACTION=dust "$prog" \{+f\} "${(z)TTY_REDIRECTION}")"${(z)FTAG_PRINT}"}
+  : ${FTAG_ACTIONS[ACTION_TWF_EDIT]:=execute(env FZFTAG_ACTION=twf-edit "$prog" \{+f\} "${(z)TTY_REDIRECTION}")"${(z)FTAG_PRINT}"}
+  : ${FTAG_ACTIONS[ACTION_RIPGREP]:=execute(env FZFTAG_ACTION=ripgrep "$prog" \{+f\} "${(z)TTY_REDIRECTION}")"${(z)FTAG_PRINT}"}
+  : ${FTAG_ACTIONS[ACTION_FORGIT]:=execute(env FZFTAG_ACTION=forgit "$prog" \{+f\} "${(z)TTY_REDIRECTION}")"${(z)FTAG_PRINT}"}
+  : ${FTAG_ACTIONS[ACTION_DOTBARE]:=execute(env FZFTAG_ACTION=dotbare "$prog" \{+f\} "${(z)TTY_REDIRECTION}")"${(z)FTAG_PRINT}"}
+  : ${FTAG_ACTIONS[ACTION_GLOW]:=execute(env FZFTAG_ACTION=glow "$prog" \{+f\} "${(z)TTY_REDIRECTION}")"${(z)FTAG_PRINT}"}
+  : ${FTAG_ACTIONS[ACTION_FFSEND]:=execute(env FZFTAG_ACTION=ffsend "$prog" \{+f\} "${(z)TTY_REDIRECTION}")"${(z)FTAG_PRINT}"}
+  : ${FTAG_ACTIONS[ACTION_TOKEI]:=execute(env FZFTAG_ACTION=tokei "$prog" \{+f\} "${(z)TTY_REDIRECTION}")"${(z)FTAG_PRINT}"}
+  : ${FTAG_ACTIONS[ACTION_DRAGON_SOURCE]:=execute(env FZFTAG_ACTION=dragon-source "$prog" \{+f\} "${(z)TTY_REDIRECTION}")"${(z)FTAG_PRINT}"}
+
+  : ${FTAG_ACTIONS[ACTION_DIRSTACK]:=execute(env FZFTAG_STATE_CHANGE=dirstack "$prog" )"${(z)FTAG_INTERNAL}${FTAG_CHPROMPT}"( Dirstack Tag> )}
+  : ${FTAG_ACTIONS[ACTION_LOCAL]:=execute(env FZFTAG_STATE_CHANGE=local "$prog" )"${(z)FTAG_INTERNAL}${FTAG_CHPROMPT}"( Local Tag> )}
+  : ${FTAG_ACTIONS[ACTION_PATH]:=execute(env FZFTAG_STATE_CHANGE=path "$prog" )"${(z)FTAG_INTERNAL}${FTAG_CHPROMPT}"( Path Tag> )}
+  : ${FTAG_ACTIONS[ACTION_GLOBAL]:=execute(env FZFTAG_STATE_CHANGE=global "$prog" )"${(z)FTAG_INTERNAL}${FTAG_CHPROMPT}"( Global Tag> )}
+  : ${FTAG_ACTIONS[ACTION_ZOXIDE]:=execute(env FZFTAG_STATE_CHANGE=zoxide "$prog" )"${(z)FTAG_INTERNAL}${FTAG_CHPROMPT}"( Zoxide Tag> )}
+  : ${FTAG_ACTIONS[ACTION_AUTOJUMP]:=execute(env FZFTAG_STATE_CHANGE=autojump "$prog" )"${(z)FTAG_INTERNAL}${FTAG_CHPROMPT}"( Jump Tag> )}
+
+  : ${FTAG_ACTIONS[ACTION_RELOAD]:=reload(env _FZFTAG_INTERNAL=reload "$prog")}
+  : ${FTAG_ACTIONS[ACTION_PREVIEW]:=toggle-preview}
+  : ${FTAG_ACTIONS[ACTION_HELP]:=execute(env _FZFTAG_SHOW=keys "$prog" | "${(z)__ftag[pager]}" )"${(z)FTAG_PRINT}"}
+  : ${FTAG_ACTIONS[ACTION_QUIT]:=abort}
+
+  : ${FTAG_ACTIONS[ACTION_TOGGLE_DOWN]:=toggle+down}
+  : ${FTAG_ACTIONS[ACTION_TEST]:=execute(env FZFTAG_ACTION=test "$prog" \{+f\} "${(z)TTY_REDIRECTION}")"${(z)FTAG_PRINT}"}
+  : ${FTAG_ACTIONS[ACTION_TWF_SWITCH]:=execute(env FZFTAG_STATE_CHANGE=twf-switch "$prog" )"${(z)FTAG_RELOAD}${FTAG_CHPROMPT}"(TWF Tag>)}
+
+  typeset -gA FTAG_KEYBINDINGS
+  # builtin zstyle ":ftag:*" bindings default
+  : ${FTAG_KEYBINDINGS[T]:=$FTAG_ACTIONS[ACTION_TEST]}
+
+  : ${FTAG_KEYBINDINGS[A]:=$FTAG_ACTIONS[ACTION_ADD]}
+  : ${FTAG_KEYBINDINGS[S]:=$FTAG_ACTIONS[ACTION_SET]}
+  : ${FTAG_KEYBINDINGS[E]:=$FTAG_ACTIONS[ACTION_EDIT]}
+  : ${FTAG_KEYBINDINGS[D]:=$FTAG_ACTIONS[ACTION_REMOVE]}
+  : ${FTAG_KEYBINDINGS[U]:=$FTAG_ACTIONS[ACTION_USAGE]}
+  : ${FTAG_KEYBINDINGS[${__ftag[fzf_alt]}-t]:=$FTAG_ACTIONS[ACTION_VITAG]}
+
+  : ${FTAG_KEYBINDINGS[F]:=$FTAG_ACTIONS[ACTION_FILEMANAGER]}
+  : ${FTAG_KEYBINDINGS[I]:=$FTAG_ACTIONS[ACTION_GIT]}
+  : ${FTAG_KEYBINDINGS[${__ftag[fzf_mod]}-s]:=$FTAG_ACTIONS[ACTION_DIRSTACK]}
+  : ${FTAG_KEYBINDINGS[${__ftag[fzf_mod]}-b]:=$FTAG_ACTIONS[ACTION_DOTBARE]}
+  : ${FTAG_KEYBINDINGS[${__ftag[fzf_mod]}-f]:=$FTAG_ACTIONS[ACTION_FORGIT]}
+  : ${FTAG_KEYBINDINGS[${__ftag[fzf_mod]}-e]:=$FTAG_ACTIONS[ACTION_GPG_EDIT]}
+  : ${FTAG_KEYBINDINGS[${__ftag[fzf_mod]}-g]:=$FTAG_ACTIONS[ACTION_GPG]}
+  : ${FTAG_KEYBINDINGS[${__ftag[fzf_alt]}-c]:=$FTAG_ACTIONS[ACTION_COPY_FILE]}
+  : ${FTAG_KEYBINDINGS[${__ftag[fzf_mod]}-d]:=$FTAG_ACTIONS[ACTION_DUA]}
+  : ${FTAG_KEYBINDINGS[${__ftag[fzf_alt]}-s]:=$FTAG_ACTIONS[ACTION_DUST]}
+  : ${FTAG_KEYBINDINGS[${__ftag[fzf_mod]}-t]:=$FTAG_ACTIONS[ACTION_TWF_EDIT]}
+  : ${FTAG_KEYBINDINGS[${__ftag[fzf_mod]}-r]:=$FTAG_ACTIONS[ACTION_RIPGREP]}
+  : ${FTAG_KEYBINDINGS[${__ftag[fzf_mod]}-o]:=$FTAG_ACTIONS[ACTION_FINDER]}
+  : ${FTAG_KEYBINDINGS[${__ftag[fzf_mod]}-w]:=$FTAG_ACTIONS[ACTION_GLOW]}
+  : ${FTAG_KEYBINDINGS[${__ftag[fzf_alt]}-i]:=$FTAG_ACTIONS[ACTION_TOKEI]}
+  : ${FTAG_KEYBINDINGS[${__ftag[fzf_alt]}-f]:=$FTAG_ACTIONS[ACTION_FFSEND]}
+  : ${FTAG_KEYBINDINGS[${__ftag[fzf_alt]}-p]:=$FTAG_ACTIONS[ACTION_DRAGON_SOURCE]}
+  : ${FTAG_KEYBINDINGS[O]:=$FTAG_ACTIONS[ACTION_OPEN]}
+  : ${FTAG_KEYBINDINGS[${__ftag[fzf_alt]}-w]:=$FTAG_ACTIONS[ACTION_OPEN_WITH]}
+  : ${FTAG_KEYBINDINGS[${__ftag[fzf_alt]}-d]:=$FTAG_ACTIONS[ACTION_DELETE]}
+  : ${FTAG_KEYBINDINGS[${__ftag[fzf_mod]}-p]:=$FTAG_ACTIONS[ACTION_PATH]}
+  : ${FTAG_KEYBINDINGS[L]:=$FTAG_ACTIONS[ACTION_LOCAL]}
+  : ${FTAG_KEYBINDINGS[G]:=$FTAG_ACTIONS[ACTION_GLOBAL]}
+  : ${FTAG_KEYBINDINGS[Z]:=$FTAG_ACTIONS[ACTION_ZOXIDE]}
+  : ${FTAG_KEYBINDINGS[J]:=$FTAG_ACTIONS[ACTION_AUTOJUMP]}
+  : ${FTAG_KEYBINDINGS[${__ftag[fzf_mod]}-y]:=${(z)FTAG_ACTIONS[ACTION_COPY]}}
+  : ${FTAG_KEYBINDINGS[V]:=$FTAG_ACTIONS[ACTION_VIEW]}
+  : ${FTAG_KEYBINDINGS[${__ftag[fzf_mod]}-v]:=$FTAG_ACTIONS[ACTION_EXTERNALVIEW]}
+
+  : ${FTAG_KEYBINDINGS[R]:=$FTAG_ACTIONS[ACTION_RELOAD]}
+  : ${FTAG_KEYBINDINGS[P]:=$FTAG_ACTIONS[ACTION_PREVIEW]}
+  : ${FTAG_KEYBINDINGS[Q]:=$FTAG_ACTIONS[ACTION_QUIT]}
+  : ${FTAG_KEYBINDINGS[esc]:=$FTAG_ACTIONS[ACTION_QUIT]}
+  : ${FTAG_KEYBINDINGS[?]:=$FTAG_ACTIONS[ACTION_HELP]}
+
+  : ${FTAG_KEYBINDINGS[${__ftag[fzf_mod]}-s]:=$FTAG_ACTIONS[ACTION_TWF_SWITCH]}
+
+  [[ $~__ftag[keyfile] != "${0:A:h}/ftag" ]] && {
+    [[ ! -r $~__ftag[keyfile] ]] && { +Ftag::msg "{err}${~__ftag[keyfile]} is not readable; aborting ..."; exit 1; }
+    local -a match mbegin mend
+    local -A out
+    local k
+
+    Ftag::ini::read "$~__ftag[keyfile]" out
+
+    for k in "${(@k)out}"; do
+      [[ "$k" = \<env_vars\>* ]] && {
+        typeset -g "${k#\<env*_*_}=${(v)out[$k]}"
       }
-    }
-    # builtin source $~__ftag[keyfile] || +Ftag::msg "{err}could not source $~__ftag[keyfile]"
+
+      [[ "$k" = \<keybindings\>* ]] && {
+        local key=${${k#\<key*_}/(#b)(M|C)-/${${${(M)match:#M}:+${FTAG_ALT:-$__ftag[fzf_alt]}}:-${FTAG_MODIFIER:-$__ftag[fzf_mod]}}-}
+        FTAG_KEYBINDINGS[$key]=$FTAG_ACTIONS[${(v)out[$k]}]
+      }
+
+      [[ "$k" = \<dir_map\>* ]] && {
+        local dir="${out[$k]}"
+        [[ $dir = \~/* ]] && dir=${~dir} || dir=${(e)dir}
+        FTAG_DIR_MAP[$dir]="%${k#\<dir_*_}"
+      }
+
+      [[ "$k" = \<fzf\>* ]] && {
+        [[ "$k" = *fzf_command ]]  && { __ftag[fzf_command]="${(v)out[$k]}" }
+        [[ "$k" = *fzf_flags ]]    && { __ftag[fzf_flags]="${(j: :)${${(Av)out[$k]}//,/}}" }
+        [[ "$k" = *fzf_bindings ]] && { __ftag[extra_binds]+=",${(j:,:)${(Av)out[$k]}}" }
+      }
+    done
   }
 
   Ftag::opts "d dump" && {
-    local -a tmp
+    local MATCH k v j; integer MBEGIN MEND long=0 adj=0; local -a tmp
+    # Maybe too many loops here? Not slow though
     tmp=(${(@)${(@v)FTAG_KEYBINDINGS}//(#m)*/${(k)FTAG_KEYBINDINGS[(r)${(b)MATCH}]}\=${(@k)FTAG_ACTIONS[(r)${(b)MATCH}]}})
-    local k v j
-    for k v (${(@kv)FTAG_KEYBINDINGS}) { FTAG[key__${k}]=$v; }
-    for k v (${(@kv)FTAG_ACTIONS})     { FTAG[action__${k#ACTION_}]=$v; }
-    for j (${tmp[@]})                  { FTAG[map__${${(s:=:)j}[1]}]=${${(s:=:)j}[2]} }
+    for k v (${(@kv)FTAG_KEYBINDINGS}) { __ftag[key__${k}]=$v; }
+    for k v (${(@kv)FTAG_ACTIONS})     { __ftag[action__${k#ACTION_}]=$v; }
+    for j (${tmp[@]})                  { __ftag[map__${${(s:=:)j}[1]}]=${${(s:=:)j}[2]}; }
+    for k (${(@ok)__ftag})             { (( $#k > $long )) && long=$#k; }
+
+    # for f (${(@k)FTAG_KEYBINDINGS} ${(@k)FTAG_ACTIONS} ${(@k)^^__ftag[map__*]}) { (( $#k > $long )) && long=$#k; }
+    # adj=$(( ${#${:-key__}} ))
+
+    +Ftag::msg "{red}${(l:COLUMNS::=:):-}{res}"
+    +Ftag::msg "{brgreen}${(l:COLUMNS/2:: :):-${FTAG[und]}KEYBINDINGS}{res}"
+    +Ftag::msg "{red}${(l:COLUMNS::=:):-}{res}"
+    for k in "${(@ok)^^__ftag[(I)key__*]}"; do
+      print -rn -- "${FTAG[brblue]}${(r:long+adj+1:: :)k}${FTAG[res]} $__ftag[$k]"
+      print
+    done
+    +Ftag::msg "{red}${(l:COLUMNS::=:):-}{res}"
+
+    +Ftag::msg "{brgreen}${(l:COLUMNS/2:: :):-${FTAG[und]}ACTIONS}{res}"
+    +Ftag::msg "{red}${(l:COLUMNS::=:):-}{res}"
+    for k in "${(@ok)^^__ftag[(I)action__*]}"; do
+      print -rn -- "${FTAG[brblue]}${(r:long+adj+1:: :)k}${FTAG[res]} $__ftag[$k]"
+      print
+    done
+    +Ftag::msg "{red}${(l:COLUMNS::=:):-}{res}"
+
+    +Ftag::msg "{brgreen}${(l:COLUMNS/2:: :):-${FTAG[und]}MAP}{res}"
+    +Ftag::msg "{red}${(l:COLUMNS::=:):-}{res}"
+    for k in "${(@ok)^^__ftag[(I)map__*]}"; do
+      print -rn -- "${FTAG[brblue]}${(r:long+adj+1:: :)k}${FTAG[res]} $__ftag[$k]"
+      print
+    done
+    +Ftag::msg "{red}${(l:COLUMNS::=:):-}{res}"
+
+    +Ftag::msg "{brgreen}${(l:COLUMNS/2:: :):-${FTAG[und]}OTHER CONFIG VARIABLES}{res}"
+    +Ftag::msg "{red}${(l:COLUMNS::=:):-}{res}"
+    for k in "${(@ok)^^__ftag[(I)^(map|key|action)__*]}"; do
+      print -rn -- "${FTAG[brblue]}${(r:long+adj+1:: :)k}${FTAG[res]} $__ftag[$k]"
+      print
+    done
+
+    exit 0
   }
 
   Ftag::opts "g genconfig" && {
     local ans
     [[ ! -d $keyfile:h ]] && { zf_mkdir -p $~keyfile:h || +Ftag::msg "{err}could not create ftag configuration directory"; exit 1; }
-    [[ -f $keyfile ]] && vared -cp "Configuration already exists. Generate another? [Y/n] >> " ans
-    [[ $ans != (#i)y(es|) ]] && { +Ftag::msg "{bryell}Configuration not generated{res}"; exit 0; }
+    [[ -f $keyfile ]] && {
+      vared -cp "${FTAG[red]}Configuration already exists.${FTAG[res]} Generate another? [Y/n] ${${${(M)LANG:#*UTF-8*}:+→}:->>} " ans
+      [[ $ans != (#i)y(es|) ]] && { +Ftag::msg "{bryell}Configuration not generated{res}"; exit 0; }
+    }
 
     # builtin print -rl -- "${(@)${(kv@qq)^^FTAG[(I)key__*]}//key__/}" | perl -pe 's/\n/ / if $. % 2' >>! "${~keyfile}"
     # builtin print -rl -- "${(@)${(kv@qq)^^FTAG[(I)action__*]}//action__/}" | perl -pe 's/\n/ / if $. % 2' >>! "${~keyfile}"
-    builtin print -r "#!/usr/bin/env zsh" >! "${~keyfile}"
-    builtin print -r "typeset -gA FTAG_KEYBINDINGS FTAG_ACTIONS" >>! "${~keyfile}"
-    builtin print -r "FTAG_KEYBINDINGS=(" >>! "${~keyfile}"
-    builtin print -rl -- "${(kv@qq)^^FTAG_KEYBINDINGS}" | perl -pe 's/\n/ / if $. % 2' >>! "${~keyfile}"
-    builtin print -r ")" >>! "${~keyfile}"
 
-    builtin print >>! "${~keyfile}"
+    builtin print -r "\
+[keybindings]
+?   = ACTION_HELP
+A   = ACTION_ADD
+D   = ACTION_REMOVE
+E   = ACTION_EDIT
+F   = ACTION_FILEMANAGER
+G   = ACTION_GLOBAL
+I   = ACTION_GIT
+J   = ACTION_AUTOJUMP
+L   = ACTION_LOCAL
+O   = ACTION_OPEN
+P   = ACTION_PREVIEW
+Q   = ACTION_QUIT
+R   = ACTION_RELOAD
+S   = ACTION_SET
+U   = ACTION_USAGE
+V   = ACTION_VIEW
+Z   = ACTION_ZOXIDE
+C-b = ACTION_DOTBARE
+C-d = ACTION_DUA
+C-e = ACTION_GPG_EDIT
+C-f = ACTION_FORGIT
+C-g = ACTION_GPG
+C-o = ACTION_FINDER
+C-p = ACTION_PATH
+C-r = ACTION_RIPGREP
+C-s = ACTION_DIRSTACK
+C-t = ACTION_TWF_EDIT
+C-v = ACTION_EXTERNALVIEW
+C-w = ACTION_GLOW
+C-y = ACTION_COPY
+M-c = ACTION_COPY_FILE
+M-d = ACTION_DELETE
+M-f = ACTION_FFSEND
+M-i = ACTION_TOKEI
+M-p = ACTION_DRAGON_SOURCE
+M-s = ACTION_DUST
+M-t = ACTION_VITAG
+M-w = ACTION_OPEN_WITH
 
-    builtin print -r "FTAG_ACTIONS=(" >>! "${~keyfile}"
-    builtin print -rl -- "${(kv@qq)^^FTAG_ACTIONS}" | perl -pe 's/\n/ / if $. % 2' >>! "${~keyfile}"
-    builtin print -r ")" >>! "${~keyfile}"
+[dir_map]
+ZDOTDIR         = $HOME/.config/zsh
+XDG_CONFIG_HOME = $HOME/.config
+XDG_CACHE_HOME  = $HOME/.cache
+XDG_DATA_HOME   = $HOME/.local/share
+XDG_BIN_HOME    = $HOME/bin
+GHQ             = $HOME/ghq
+GITHUB          = $HOME/github
+PR_GITHUB       = $HOME/projects/github
+DOWNLOADS       = $HOME/Downloads
+DOCUMENTS       = $HOME/Documents
+DESKTOP         = $HOME/Desktop
+PICTURES        = $HOME/Pictures
+LIBRARY         = $HOME/Library
+APPLICATIONS    = $HOME/Applications
+MUSIC           = $HOME/Music
+MOVIES          = $HOME/Movies
+WIKI_DIR        = $HOME/vimwiki
+LOCAL_USR       = /usr/local
+HOME            = $HOME
+
+[env_vars]
+FTAG_PAGER       = bat --paging=always -f
+FTAG_COPY        = pbcopy
+FTAG_MODIFIER    = ctrl
+FTAG_ALT         = alt
+FTAG_FILEMANAGER = lf
+FTAG_FILE_PREV   = bat --style=numbers --color=always
+FTAG_DIR_PREV    = exa -TL 3
+FTAG_COLORS      =
+
+[fzf]
+fzf_command  = fzf
+fzf_flags    =
+fzf_bindings = alt-shift-down:preview-down,alt-shift-up:preview-up" >! "${~keyfile}"
 
     +Ftag::msg "{brgreen}Configuration generated:{res} {yell}${~keyfile}{res}"
     exit 0
   }
-
-  # local -a arr
-  # arr=(${(@f)"$(<$keyfile)"})
-  # print -rl $arr
-  # exit
 
   # zstyle -s ":ftag:*" cache-file ${cf::=__ftag[cachefile]} || {
   #   ! Ftag::declare "FTAG_CACHEFILE=${XDG_CONFIG_HOME:-$HOME/.config}/ftag/config" && __ftag[cachefile]=$FTAG_CACHEFILE || {
@@ -1523,15 +1696,13 @@ typeset -gA FTAG_KEYBINDINGS
   # print -r -- ${(%)tmp::="%D{%s}"} > "${~lastcache_file}"
 
   # print -r -- "FTAG_KEYBINDINGS=( ${${(kv@qq)^^FTAG[(I)key__*]}//key__/} )" > $~__ftag[cachefile]
-
   # print -rl -- ${(kv@qq)^^FTAG[(I)(key|map|action)__*]}
 }
-
-# print -rl -- ${(kv)FTAG[(I)action__*]}
 
 # Actions used for fzf
 typeset -a __FTAG_ACTIONS
 __FTAG_ACTIONS=( ${(@)${(k)FTAG_KEYBINDINGS//(#m)*/\-\-bind=$MATCH:${FTAG_KEYBINDINGS[${(z)MATCH}]}}} )
+
 # ]]] == END: Config
 
 # SECTION: == Create Filter == [[[
@@ -1572,14 +1743,14 @@ if [[ -n "$FZFTAG_ACTION" ]]; then
       # Testing for development
       local fname fdir tag file
       Ftag::parse_format "test"
-      vared -cp "TEST: ${nl}$(Ftag::vared-format ${pathf[@]})${nl}${nl} Tags  " tag
+      vared -cp "TEST: ${nl}$(Ftag::vared::formatter ${pathf[@]})${nl}${nl} Tags  " tag
       # for file in "${(f)reply[@]}"; do
       # done
       ;;
     (set)
       local fname fdir tag file
       Ftag::parse_format "set tags"
-      vared -cp "${FTAG[byell]}[]${FTAG[res]} ${FTAG[und]}Set tags for${FTAG[res]}:${nl}$(Ftag::vared-format ${pathf[@]})${nl}${nl} " tag
+      vared -cp "${FTAG[byell]}[]${FTAG[res]} ${FTAG[und]}Set tags for${FTAG[res]}:${nl}$(Ftag::vared::formatter ${pathf[@]})${nl}${nl} " tag
       for file in "${pathf[@]}"; do
         Ftag::map-back "$file"
         # Wutag only works if variables are set first
@@ -1598,7 +1769,7 @@ if [[ -n "$FZFTAG_ACTION" ]]; then
     (add)
       local fname fdir tag file
       Ftag::parse_format "add tags"
-      vared -cp "${FTAG[bgreen]}[+]${FTAG[res]} ${FTAG[und]}Add tags for${FTAG[res]}:${nl}$(Ftag::vared-format ${pathf[@]})${nl}${nl} " tag
+      vared -cp "${FTAG[bgreen]}[+]${FTAG[res]} ${FTAG[und]}Add tags for${FTAG[res]}:${nl}$(Ftag::vared::formatter ${pathf[@]})${nl}${nl} " tag
       for file in "${pathf[@]}"; do
         Ftag::map-back "$file"
         fname="${reply:t}" fdir="${reply:h}"
@@ -1615,7 +1786,7 @@ if [[ -n "$FZFTAG_ACTION" ]]; then
     (remove)
       local fname fdir tag file
       Ftag::parse_format "remove tags"
-      vared -cp "${FTAG[bred]}[]${FTAG[res]} ${FTAG[und]}Remove tags for${FTAG[res]}:${nl}$(Ftag::vared-format ${pathf[@]})${nl}${nl} " tag
+      vared -cp "${FTAG[bred]}[]${FTAG[res]} ${FTAG[und]}Remove tags for${FTAG[res]}:${nl}$(Ftag::vared::formatter ${pathf[@]})${nl}${nl} " tag
       for file in "${pathf[@]}"; do
         Ftag::map-back "$file"
         fname="${reply:t}" fdir="${reply:h}"
@@ -1630,7 +1801,7 @@ if [[ -n "$FZFTAG_ACTION" ]]; then
       done
       ;;
     (usage)
-      tag --usage | ${${(z)${(M)${FTAG_PAGER}:#bat*}:+${FTAG_PAGER} -l bash}:-less}
+      tag --usage | ${${(z)${(M)${__ftag[pager]}:#bat*}:+${__ftag[pager]} -l bash}:-less}
       ;;
     (vitag)
       (( $#pathf > 1 )) && {
@@ -1675,7 +1846,6 @@ if [[ -n "$FZFTAG_ACTION" ]]; then
       }
       ;;
     (edit)
-      # TODO: maybe change to open
       ${EDITOR:-vim} "$reply"
       ;;
     (file-manager)
@@ -1735,7 +1905,7 @@ if [[ -n "$FZFTAG_ACTION" ]]; then
         builtin emulate -LR zsh -o extendedglob -o noshortloops -o warncreateglobal
         local -a batv
         local f; for f ($pathf) { Ftag::map-back "$f" && batv+=( "$reply" ) }
-        ${${(z)${(M)${FTAG_PAGER}:#bat*}:+bat --paging=always -f --style=header,snip}:-less} "${batv[@]}"
+        ${${(z)${(M)${__ftag[pager]}:#bat*}:+bat --paging=always -f --style=header,snip}:-less} "${batv[@]}"
       }
       ;;
     (open-with)
@@ -1775,35 +1945,35 @@ if [[ -n "$FZFTAG_ACTION" ]]; then
       (( $#pathf > 1 )) && { OS::notify "Only one selection is permitted with preview"; return 1 }
       {
         case "${reply:e}" in
-          (text/html) w3m "${reply:A}" | ${(z)FTAG_PAGER} ;;
-          (zip) atool --list -- "${reply:A}" | ${(z)FTAG_PAGER} ;;
-          (tgz|tar.gz) tar tzf "${reply:A}" | ${(z)FTAG_PAGER} ;;
-          (tar.bz2|tbz2) tar tjf "${reply:A}" | ${(z)FTAG_PAGER} ;;
-          (tar.txz|txz) xz --list "${reply:A}" | ${(z)FTAG_PAGER} ;;
-          (tar) tar tf "${reply:A}" | ${(z)FTAG_PAGER} ;;
-          (jar|war|ear|oxt) unzip -l "${reply:A}" | ${(z)FTAG_PAGER} ;;
-          (rar) unrar l "${reply:A}" | ${(z)FTAG_PAGER} ;;
-          (7z) 7z l "${reply:A}" | ${(z)FTAG_PAGER} ;;
-          ([1-8]) man "${reply:A}" | col -b | ${(z)FTAG_PAGER} ;;
-          (o) nm "${reply:A}" | ${(z)FTAG_PAGER} ;;
-          (torrent) transmission-show "${reply:A}" | "${(z)FTAG_PAGER}" ;;
-          (iso) iso-info --no-header -l "${reply:A}" | ${(z)FTAG_PAGER} ;;
-          (odt|ods|odp|sxw) odt2txt "${reply:A}" | ${(z)FTAG_PAGER} ;;
-          (doc) catdoc "${reply:A}" | ${(z)FTAG_PAGER} ;;
-          (docx) docx2txt "${reply:A}" | ${(z)FTAG_PAGER} ;;
+          (text/html) w3m "${reply:A}" | ${(z)__ftag[pager]} ;;
+          (zip) atool --list -- "${reply:A}" | ${(z)__ftag[pager]} ;;
+          (tgz|tar.gz) tar tzf "${reply:A}" | ${(z)__ftag[pager]} ;;
+          (tar.bz2|tbz2) tar tjf "${reply:A}" | ${(z)__ftag[pager]} ;;
+          (tar.txz|txz) xz --list "${reply:A}" | ${(z)__ftag[pager]} ;;
+          (tar) tar tf "${reply:A}" | ${(z)__ftag[pager]} ;;
+          (jar|war|ear|oxt) unzip -l "${reply:A}" | ${(z)__ftag[pager]} ;;
+          (rar) unrar l "${reply:A}" | ${(z)__ftag[pager]} ;;
+          (7z) 7z l "${reply:A}" | ${(z)__ftag[pager]} ;;
+          ([1-8]) man "${reply:A}" | col -b | ${(z)__ftag[pager]} ;;
+          (o) nm "${reply:A}" | ${(z)__ftag[pager]} ;;
+          (torrent) transmission-show "${reply:A}" | "${(z)__ftag[pager]}" ;;
+          (iso) iso-info --no-header -l "${reply:A}" | ${(z)__ftag[pager]} ;;
+          (odt|ods|odp|sxw) odt2txt "${reply:A}" | ${(z)__ftag[pager]} ;;
+          (doc) catdoc "${reply:A}" | ${(z)__ftag[pager]} ;;
+          (docx) docx2txt "${reply:A}" | ${(z)__ftag[pager]} ;;
           # (csv) bat "${reply:A}" | sed s/,/\\n/g ;;
           # (csv) bat --paging=always -f -l csv "${reply:A}" ;;
-          (csv) ${(z)${${(M)FTAG_PAGER:#bat*}:+${FTAG_PAGER} -l csv}} "${reply:A}" ;;
-          (json) jq --color-output . "${reply:A}" | ${(z)FTAG_PAGER} ;;
-          (asc) cat "${reply:A}" | ${(z)FTAG_PAGER} ;;
-          (sha1|sha256|sha512|md5) rhash -c "${reply:A}" | ${(z)FTAG_PAGER} ;;
-          (ipynb) jupview -t KimbieDark "${reply:A}" | ${(z)FTAG_PAGER} ;;
-          (pdf) pdftotext -l 10 -nopgbrk -q "${reply:A}" - | ${(z)FTAG_PAGER} ;;
-          (jpg|jpeg|png) viu "${reply:A}" | ${(z)FTAG_PAGER} ;;
+          (csv) ${(z)${${(M)__ftag[pager]:#bat*}:+${__ftag[pager]} -l csv}} "${reply:A}" ;;
+          (json) jq --color-output . "${reply:A}" | ${(z)__ftag[pager]} ;;
+          (asc) cat "${reply:A}" | ${(z)__ftag[pager]} ;;
+          (sha1|sha256|sha512|md5) rhash -c "${reply:A}" | ${(z)__ftag[pager]} ;;
+          (ipynb) jupview -t KimbieDark "${reply:A}" | ${(z)__ftag[pager]} ;;
+          (pdf) pdftotext -l 10 -nopgbrk -q "${reply:A}" - | ${(z)__ftag[pager]} ;;
+          (jpg|jpeg|png) viu "${reply:A}" | ${(z)__ftag[pager]} ;;
           # (*) mediainfo "${reply:A}" ;;
         esac
       } always {
-          Ftag::dep "mediainfo" && mediainfo "${reply:A}" | ${(z)FTAG_PAGER}
+          Ftag::dep "mediainfo" && mediainfo "${reply:A}" | ${(z)__ftag[pager]}
       }
       ;;
     (delete)
@@ -1911,7 +2081,6 @@ fi
 local filter output
 if [[ -n "$_FZFTAG_RELOAD" ]] {
   Ftag::tag "${(z)${(@f)"$(<$current_filter)"}}"
-  OS::notify "x was rcloned to"
 }
 # ]]] == END: Reload
 
