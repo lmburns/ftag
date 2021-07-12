@@ -28,8 +28,8 @@ arguments=(
   '*-v[Display verbose messages when using ftag as a tag wrapper]'
   '--font[Choose figlet font]:choose a figlet font:->figlet_fonts'
   '-f[Choose figlet font]:choose a figlet font:->figlet_fonts'
-  '--wrapper[Use ftag as a wrapper to color output of tag]:wrapper commands:->_tag'
-  '-W[Use ftag as a wrapper to color output of tag]:wrapper commands:->_tag'
+  '--wrapper[Use ftag as a wrapper to color output of tag]:wrapper commands:->tag'
+  '-W[Use ftag as a wrapper to color output of tag]:wrapper commands:->tag'
   # ':*:message:action'
   '--color[Specify no more than 3 colors for the output]:choose colors:->_colors'
   '-C[Specify no more than 3 colors for the output]:choose colors:->_colors'
@@ -84,31 +84,10 @@ case $state in
     _describe -t colors '== Colors ==' colors && \
       ret=0
   ;;
-_tag)
-  local -a tag_args
-  tag_args=(
-    {-v,--version}'[display version]'
-    {-h,--help}'[display this help]'
-    {-A,--all}'[display invisible files while enumerating]'
-    {-e,--enter}'[enter and enumerate directories provided]'
-    {-R,--recursive}'[recursively process directories]'
-    {-n,--name}'[turn on filename display in output (default)]'
-    {-N,--no-name}'[turn off filename display in output (list, find, match)]'
-    {-t,--tags}'[turn on tags display in output (find, match)]'
-    {-T,--no-tags}'[turn off tags display in output (list)]'
-    {-g,--garrulous}'[display tags each on own line (list, find, match)]'
-    {-G,--no-garrulous}'[tags comma-separated after filename (default)]'
-    {-c,--color}'[display tags in color]'
-    {-p,--slash}'[terminate each directory name with a slash]'
-    {-0,--nul}'[terminate lines with NUL (\0) for use with xargs -0]'
-    '--home[find tagged files in user home directory]'
-    '--local[find tagged files in home + local filesystems]'
-    '--network[find tagged files in home + local + network filesystems]'
-    '*:filename:_files'
-  )
-  # _describe -t tag_args '== Tag Arguments ==' tag_args && \
-  _arguments "${_arg_opts[@]}" $tag_args && \
-    ret=0
+  tag)
+    # _wanted -V recent-dirs expl 'recent directory' compadd -S '' -Q -a values
+    $_comps[tag] "$@" && \
+      ret=0
   ;;
   *)
     _alternative \
