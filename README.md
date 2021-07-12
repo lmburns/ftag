@@ -6,13 +6,16 @@ Parameters requiring arguments can be used with an equals sign (e.g., `--path=`)
 
 ```sh
 FLAGS:
+        -C, --color <color>      Specify list of colors to use (use -C ls|list to list colors)
         -N, --nofzf              No fzf, however not a wrapper
+        -T, --lolcat             Color the header with lolcat
         -W, --wrapper <cmds>     No fzf, but is a wrapper and can use tag commands
         -b, --boxes              Add a box around header with boxes
-        -c, --lolcat             Color the header with lolcat
-        -f, --cfont <font>       Use custom font with figlet (some are provided)
+        -c, --config <conf>      Specify configuration file
+        -d, --dump               Dump configuration (mappings, actions, keyfile)
+        -f, --font <font>        Use custom font with figlet (some are provided)
         -h, --help               Display this help message
-        -j, --autojump           Use autojump to select directory to use tags (only shows tagged files)
+        -j, --jump               Use autojump to select directory to use tags (only shows tagged files)
         -l, --local              Use tag in a local directory
         -n, --nocolor            Don't use colored output
         -p, --path <path>        Enter a path for ftag to start
@@ -22,9 +25,10 @@ FLAGS:
         -v, --verbose            Display verbosity (-vvv is max; only used with wrapper as of now)
         -w, --wutag              Also tag files with wutag (-ww only uses wutag)
         -z, --zoxide             Use zoxide to select directory to use tags (only shows tagged files)
-        If a tag is searched for (optional argument), it must be last. Figlet is ran if
-        toilet isn't specified and vice-versa. The default printing (no flags specified
-         and figlet installed) looks the nicest.
+         If a tag is searched for (optional argument), it must be last. Figlet is ran if
+         toilet isn't specified and vice-versa. The default printing (no flags specified
+         and figlet installed) looks the nicest. Parameters requiring arguments can be used
+         with an equals sign (e.g., --path=)
 ```
 
 ### Keybindings within `ftag`
