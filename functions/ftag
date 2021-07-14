@@ -264,7 +264,7 @@ function Ftag::tag() {
           for t ($packs) {
             unpacked=( "${(Q@)${(z@)t}}" )
             Ftag::color-tag "$unpacked[2]"
-            unpacked[1]=${FTAG[brgreen]}${unpacked[1]}${FTAG[res]}
+            unpacked[1]=${__bc3}${unpacked[1]}${FTAG[res]}
             builtin print -n "${(r:longest+adjust+1:: :)unpacked[1]} $REPLY"
             builtin print
           }
@@ -272,7 +272,7 @@ function Ftag::tag() {
         ;;
       (-h|--help)
         # tag -h
-        +Ftag::msg "{bgreen}External tag help:{res}" \
+        +Ftag::msg "{bgreen}{und}External tag help:{res}" \
           "{nl}${${${(@)$(command tag --help)}//(#m)(${(~j:|:)__FTAG_EXTERNAL_OPTS})/${FTAG[yell]}${MATCH}${FTAG[res]}}//(#m)(-##[[:alnum:]]##)/${FTAG[green]}${MATCH}${FTAG[res]}}"
         ;;
       (*-[[:alpha:]]#g[[:alpha:]]#*|*--garrulous*)
@@ -740,6 +740,7 @@ function Ftag::gpg() {
   local tmpfile
   zparseopts -a opts -D ${(s::):-e}
   zmodload -Fa zsh/files b:zf_rm b:zf_mv
+  # gpg-tui --select key_id
   # TODO: add option for multiple files
   trap "zf_rm -f $tmpfile >/dev/null" EXIT INT TERM
   tmpfile="${TMPDIR:-/tmp}/ftag.dump.$RANDOM"
@@ -919,12 +920,13 @@ function Ftag::open::with() {
   apps+=( ${(f)"$(command ls /System/Applications)"} )
 
   Ftag::parse_format "open with"
+  local symb="${${${(M)${langinfo[CODESET]:-$LANG}:#(#i)*UTF-8*}:→}:-=>}"
   vared -cp "Type '${FTAG[bryell]}app${FTAG[res]}' to list applications \
-    ${FTAG[nl]}Open with ${${${(M)LANG:#*UTF-8*}:+→}:-=>} " app
-  [[ $app = app ]] && choice=$(builtin print -rl $apps | fzf +m --no-height --prompt="App ${${${(M)LANG:#*UTF-8*}:+→}:-=>} " ) || {
+    ${FTAG[nl]}Open with $symb " app
+  [[ $app = app ]] && choice=$(builtin print -rl $apps | fzf +m --no-height --prompt="App $symb " ) || {
     apps=( ${(@M)apps:#(#i)*$app*} )
     (( $#apps > 1 )) && {
-      choice=$(builtin print -rl $apps | fzf +m --no-height --prompt="App ${${${(M)LANG:#*UTF-8*}:+→}:-=>} ")
+      choice=$(builtin print -rl $apps | fzf +m --no-height --prompt="App $symb ")
     } || choice="$apps[1]"
   }
   [[ -n $choice ]] && command open -a $choice "$@"
@@ -1136,7 +1138,7 @@ __FTAG_OPTS=(
     "-f, --font <font>"    "Use custom font with figlet (some are provided)"
     "-h, --help"           "Display this help message"
     "-c, --config <conf>"  "Specify configuration file"
-    "-d, --dump"           "Dump configuration (mappings, actions, keyfile)"
+    "-d, --dump"           "Dump configuration (mappings, actions, keyfile). Optional parameter of p|pager (no hyphen) to view in pager"
     "-v, --verbose"        "Display verbosity (-vvv is max; only used with wrapper as of now)"
 )
 
@@ -1211,11 +1213,14 @@ __FTAG_ENVIRONVARS=(
 
 # SECTION: == Imports / Setting Variables == [[[
 zmodload -Fa zsh/zutil b:zparseopts \
-  || +Ftag::msg "{err}{green}zsh/zutil{res} is required to use this program{res}"
+  || { +Ftag::msg "{err}{green}zsh/zutil{res} is required to use this program{res}"; exit 1; }
 
-# ${commands[@]} array
 zmodload -Fa zsh/parameter p:commands p:parameters \
-  || +Ftag::msg "{err}{green}zsh/parameter{res} is requred to use this program{res}"
+  || { +Ftag::msg "{err}{green}zsh/parameter{res} is requred to use this program{res}"; exit 1; }
+
+zmodload -Fa zsh/langinfo p:langinfo \
+  || [[ -n "$LANG" ]] \
+  || +Ftag::msg "{warn}{green}zsh/langinfo{res} is recommended to use this program{res}"
 
 # tput $COLUMNS
 zmodload zsh/terminfo 2>/dev/null
@@ -1224,11 +1229,11 @@ zmodload zsh/termcap 2>/dev/null
 # a all = not used
 # Set query as optional args to prevent errors
 local -A opts
-local -a cfont sort wtag query verbose optpath ccolor config
+local -a cfont sort wtag query verbose optpath ccolor config dump
 typeset -gaH wrapper
 # FIX: error is never hit
 zparseopts -D -A opts h -help b -boxes T -lolcat t -toilet g -genconfig \
-    l -local z -zoxide j -jump n -nocolor N -nofzf d -dump {W,-wrapper}:=wrapper \
+    l -local z -zoxide j -jump n -nocolor N -nofzf {d,-dump}::=dump {W,-wrapper}:=wrapper \
     {f,-font}::=cfont {p,-path}:=optpath {q,-query}::=query {C,-color}:=ccolor \
     {c,-config}:=config {w,-wutag}+=wtag {s,-sort}::=sort {v,-verbose}+=verbose || {
       Ftag::usage; exit 1;
@@ -1242,8 +1247,8 @@ FTAG=(
   blue   $'\e[38;5;4m'  bblue  $'\e[01;34m' brblue  $'\e[38;5;12m'
   magen  $'\e[38;5;5m'  bmagen $'\e[01;35m' brmagen $'\e[38;5;13m'
   cyan   $'\e[38;5;6m'  bcyan  $'\e[01;36m' brcyan  $'\e[38;5;14m'
-  und    $'\e[4m'       bold   $'\e[1m'     res    $'\e[0m'
-  tb     $' \t '        nl     $'\n'
+  und    $'\e[4m'       bold   $'\e[1m'     bg      $'\e[3m'
+  tb     $' \t '        nl     $'\n'        res     $'\e[0m'
 )
 
 # ??
@@ -1278,13 +1283,13 @@ export FZFTAG_QUERY
 
 typeset -gH FZFTAG_PATH
 # This array is split instead of above, where it's joined
-FZFTAG_PATH=${${${(@)optpath##-(p|-path(=|))}[-1]//=/}:-} # fzf path
+FZFTAG_PATH=${${${${(@)optpath##-(p|-path(=|))}[-1]}//=/}:-} # fzf path
 export FZFTAG_PATH
 
 local conf
-conf=${${~${${config##-(c|-config(=|))}[-1]//=/}}:-}
+conf=${${~${${config##-(c|-config(=|))}[-1]}//=/}:-}
 
-sort=${${${sort##-(s|-sort(=|))}[-1]//=/}:-}
+sort=${${${${sort##-(s|-sort(=|))}[-1]}//=/}:-}
 [[ -n $sort && $sort != (+|a|asc|++|d|desc) ]] && {
   +Ftag::msg "{err}sorting must be (+|a|asc) for ascending or (++|d|desc) for descending"
   exit 1
@@ -1384,7 +1389,6 @@ export LESS="-r $LESS"
 
   # Precedence of configuration
   # key-file | FTAG_KEYFILE => zstyle => environment variables
-  zstyle ":ftag:" key-file "$XDG_CONFIG_HOME/ftag/config.ini"
   Ftag::zstyle -s fzf-command       ${ph::=__ftag[fzf_command]} || : ${__ftag[fzf_command]::=fzf}
   Ftag::zstyle -a fzf-bindings      bind                        && __ftag[extra_binds]+=,${(j:,:)bind}
   Ftag::zstyle -a fzf-flags         fzf_flags                   && : ${__ftag[fzf_flags]::=${(j: :)fzf_flags}}
@@ -1534,6 +1538,7 @@ export LESS="-r $LESS"
       }
 
       [[ "$k" = \<colors\>* ]] && {
+        # Specify new key to prevent having 3+ colors
         __ftag[kcolors]+="${(Av)out[$k]} "
       }
     done
@@ -1557,63 +1562,77 @@ export LESS="-r $LESS"
   }
 
   (( $#ccolor > 3 ))       && {
+    local dot="${${${(M)${langinfo[CODESET]:-$LANG}:#(#i)*UTF-8*}:+}:--}"
     +Ftag::msg "{err}specify no more than 3 colors." \
-      "{nl}  • {bmagen}Color 1{res} = tags" \
-      "{nl}  • {blue}Color 2{res} = tag separator" \
-      "{nl}  • {green}Color 3{res} = %DIR_MAP shortener"
+      "{nl}  $dot {bmagen}Color 1{res} = tags" \
+      "{nl}  $dot {blue}Color 2{res} = tag separator" \
+      "{nl}  $dot {green}Color 3{res} = %DIR_MAP shortener"
     exit 1
   }
 
   # Do this instead of only use ccolor to provide 3 colors even if only one is specified
-  typeset -gH __c1 __c2 __c3
+  typeset -gH __c1 __c2 __c3 __bc3
   [[ -n $ccolor[1] ]] && __c1="${FTAG[$ccolor[1]]}" || __c1="${FTAG[${${(s: :)__ftag[colors]}[1]}]}"
   [[ -n $ccolor[2] ]] && __c2="${FTAG[$ccolor[2]]}" || __c2="${FTAG[${${(s: :)__ftag[colors]}[2]}]}"
   [[ -n $ccolor[3] ]] && __c3="${FTAG[$ccolor[3]]}" || __c3="${FTAG[${${(s: :)__ftag[colors]}[3]}]}"
+  [[ -n $ccolor[3] ]] && __bc3="${FTAG[${ccolor[3]:+b${ccolor[3]}}]}"
 
-  Ftag::opts "d dump" && {
-    local MATCH k v j; integer MBEGIN MEND long=0 adj=0; local -a tmp
-    # Maybe too many loops here? Not slow though
-    tmp=( ${(@)${(@v)FTAG_KEYBINDINGS}//(#m)*/${(k)FTAG_KEYBINDINGS[(r)${(b)MATCH}]}\=${(@k)FTAG_ACTIONS[(r)${(b)MATCH}]}} )
-    for k v (${(@kv)FTAG_KEYBINDINGS}) { __ftag[key__${k}]=$v; }
-    for k v (${(@kv)FTAG_ACTIONS})     { __ftag[action__${k#ACTION_}]=$v; }
-    for j (${tmp[@]})                  { __ftag[map__${${(s:=:)j}[1]}]=${${(s:=:)j}[2]}; }
-    for k (${(@ok)__ftag})             { (( $#k > $long )) && long=$#k; }
+  [[ -n $dump ]] && {
+    {
+      local MATCH k v j; integer MBEGIN MEND long=0 adj=0; local -a tmp match mbegin mend
+      # Maybe too many loops here? Not slow though
+      tmp=( ${(@)${(@v)FTAG_KEYBINDINGS}//(#m)*/${(k)FTAG_KEYBINDINGS[(r)${(b)MATCH}]}\=${(@k)FTAG_ACTIONS[(r)${(b)MATCH}]}} )
+      for k v (${(@kv)FTAG_KEYBINDINGS}) { __ftag[key__${k}]=$v; }
+      for k v (${(@kv)FTAG_ACTIONS})     { __ftag[action__${k#ACTION_}]=$v; }
+      for j (${tmp[@]})                  { __ftag[map__${${(s:=:)j}[1]}]=${${(s:=:)j}[2]}; }
+      for k (${(@ok)__ftag})             { (( $#k > $long )) && long=$#k; }
 
-    # for f (${(@k)FTAG_KEYBINDINGS} ${(@k)FTAG_ACTIONS} ${(@k)^^__ftag[map__*]}) { (( $#k > $long )) && long=$#k; }
-    # adj=$(( ${#${:-key__}} ))
+      # for f (${(@k)FTAG_KEYBINDINGS} ${(@k)FTAG_ACTIONS} ${(@k)^^__ftag[map__*]}) { (( $#k > $long )) && long=$#k; }
+      adj=$(( ${#${:-key__}} + ${#FTAG[red]} * 2 + ${#FTAG[res]} * 2 ))
 
-    +Ftag::msg "{red}${(l:COLUMNS::=:):-}{res}"
-    +Ftag::msg "{brgreen}${(l:COLUMNS/2:: :):-${FTAG[und]}KEYBINDINGS}{res}"
-    +Ftag::msg "{red}${(l:COLUMNS::=:):-}{res}"
-    for k in "${(@ok)^^__ftag[(I)key__*]}"; do
-      print -rn -- "${FTAG[brblue]}${(r:long+adj+1:: :)k}${FTAG[res]} $__ftag[$k]"
-      print
-    done
-    +Ftag::msg "{red}${(l:COLUMNS::=:):-}{res}"
+      +Ftag::msg "{red}${(l:COLUMNS::=:):-}{res}"
+      +Ftag::msg "{bgreen}${(l:COLUMNS/2:: :):-${FTAG[und]}KEYBINDINGS}{res}"
+      +Ftag::msg "{red}${(l:COLUMNS::=:):-}{res}"
+      for k in "${(@ok)^^__ftag[(I)key__*]}"; do
+        print -rn -- "${(r:long+adj+1:: :)k/key__/${FTAG[red]}key__${FTAG[res]}${FTAG[brcyan]}}${FTAG[res]} \
+          ${__ftag[$k]//(#b)(FZFTAG_[^=]#)(=)([^[:blank:]]#)/${FTAG[yell]}${match[1]}${FTAG[res]}${match[2]}${FTAG[brgreen]}${match[3]}${FTAG[res]}}"
+        print
+      done
+      +Ftag::msg "{red}${(l:COLUMNS::=:):-}{res}"
 
-    +Ftag::msg "{brgreen}${(l:COLUMNS/2:: :):-${FTAG[und]}ACTIONS}{res}"
-    +Ftag::msg "{red}${(l:COLUMNS::=:):-}{res}"
-    for k in "${(@ok)^^__ftag[(I)action__*]}"; do
-      print -rn -- "${FTAG[brblue]}${(r:long+adj+1:: :)k}${FTAG[res]} $__ftag[$k]"
-      print
-    done
-    +Ftag::msg "{red}${(l:COLUMNS::=:):-}{res}"
+      +Ftag::msg "{bgreen}${(l:COLUMNS/2:: :):-${FTAG[und]}ACTIONS}{res}"
+      +Ftag::msg "{red}${(l:COLUMNS::=:):-}{res}"
+      for k in "${(@ok)^^__ftag[(I)action__*]}"; do
+        print -rn -- "${(r:long+adj+1:: :)k/action__/${FTAG[red]}action__${FTAG[res]}${FTAG[brcyan]}}${FTAG[res]} \
+          ${__ftag[$k]//(#b)(FZFTAG_[^=]#)(=)([^[:blank:]]#)/${FTAG[yell]}${match[1]}${FTAG[res]}${match[2]}${FTAG[brgreen]}${match[3]}${FTAG[res]}}"
+        print
+      done
+      +Ftag::msg "{red}${(l:COLUMNS::=:):-}{res}"
 
-    +Ftag::msg "{brgreen}${(l:COLUMNS/2:: :):-${FTAG[und]}MAP}{res}"
-    +Ftag::msg "{red}${(l:COLUMNS::=:):-}{res}"
-    for k in "${(@ok)^^__ftag[(I)map__*]}"; do
-      print -rn -- "${FTAG[brblue]}${(r:long+adj+1:: :)k}${FTAG[res]} $__ftag[$k]"
-      print
-    done
-    +Ftag::msg "{red}${(l:COLUMNS::=:):-}{res}"
+      +Ftag::msg "{bgreen}${(l:COLUMNS/2:: :):-${FTAG[und]}MAP}{res}"
+      +Ftag::msg "{red}${(l:COLUMNS::=:):-}{res}"
+      for k in "${(@ok)^^__ftag[(I)map__*]}"; do
+        print -rn -- "${(r:long+adj+1:: :)k/map__/${FTAG[red]}map__${FTAG[res]}${FTAG[brcyan]}} ${FTAG[brgreen]}$__ftag[$k]${FTAG[res]}"
+        print
+      done
+      +Ftag::msg "{red}${(l:COLUMNS::=:):-}{res}"
 
-    +Ftag::msg "{brgreen}${(l:COLUMNS/2:: :):-${FTAG[und]}OTHER CONFIG VARIABLES}{res}"
-    +Ftag::msg "{red}${(l:COLUMNS::=:):-}{res}"
-    for k in "${(@ok)^^__ftag[(I)^(map|key|action)__*]}"; do
-      print -rn -- "${FTAG[brblue]}${(r:long+adj+1:: :)k}${FTAG[res]} $__ftag[$k]"
-      print
-    done
+      +Ftag::msg "{bgreen}${(l:COLUMNS/2:: :):-${FTAG[und]}OTHER CONFIG VARIABLES}{res}"
+      +Ftag::msg "{red}${(l:COLUMNS::=:):-}{res}"
+      adj=$(( $adj - ${#FTAG[red]} * 2 - ${#FTAG[res]}))
+      for k in "${(@ok)^^__ftag[(I)^(map|key|action)__*]}"; do
+        Ftag::map-short "$__ftag[$k]"
+        [[ "$k" = colors ]] && {
+          local -a col=( ${${(s: :)__ftag[$k]}/(#m)*/${FTAG[$MATCH]}${MATCH}${FTAG[res]}} )
+          print -rn -- "${FTAG[red]}${(r:long+adj:: :)k}${FTAG[res]} $col"
+        } || print -rn -- "${FTAG[red]}${(r:long+adj:: :)k}${FTAG[res]} $SHORT"
+        print
+      done
+    } | ${${${(M)${${${dump##-(d|-dump(=|))}[-1]}//=/}:#(p|pager)}:+${(z)__ftag[pager]}}:-cat}
 
+    [[ -z ${(M)${${${dump##-(d|-dump(=|))}[-1]}//=/}:#(p|pager)} ]] && {
+      +Ftag::msg "{warn}use {yell}p{res} or {yell}pager{res} (no hyphens)"
+    }
     exit 0
   }
 
@@ -1621,7 +1640,8 @@ export LESS="-r $LESS"
     local ans
     [[ ! -d $keyfile:h ]] && { zf_mkdir -p $~keyfile:h || +Ftag::msg "{err}could not create ftag configuration directory"; exit 1; }
     [[ -f $keyfile ]] && {
-      vared -cp "${FTAG[red]}Configuration already exists.${FTAG[res]} Generate another? [Y/n] ${${${(M)LANG:#*UTF-8*}:+→}:->>} " ans
+      local symb="${${${(M)${langinfo[CODESET]:-$LANG}:#(#i)*UTF-8*}:→}:->>}"
+      vared -cp "${FTAG[red]}Configuration already exists.${FTAG[res]} Generate another? [Y/n] $symb " ans
       [[ $ans != (#i)y(es|) ]] && { +Ftag::msg "{bryell}Configuration not generated{res}"; exit 0; }
     }
 
@@ -2001,9 +2021,9 @@ if [[ -n "$FZFTAG_ACTION" ]]; then
         [[ "$yesno" == (#i)y(es|) ]] && {
           for f ($array) {
             case 1 in
+              (${+commands[dump]}) dump "${f}" && OS::notify "dump: ${f:t} deleted"; ret=$? ;;
               (${+commands[trash-put]}) trash-put "${f}" && OS::notify "put: ${f:t} deleted"; ret=$? ;;
               (${+commands[rip]}) rip "${f}" && OS::notify "rip: ${f:t} deleted"; ret=$? ;;
-              (${+commands[dump]}) dump "${f}" >/dev/null && OS::notify "dump: ${f:t} deleted"; ret=$? ;;
               (${+commands[gomi]}) gomi "${f}" && OS::notify "gomi: ${f:t} deleted"; ret=$? ;;
               (${+commands[osascript]})
                     osascript -e 'tell application "Finder" to delete every item of {''(POSIX file "'${^f:A}'")''}' \

@@ -64,7 +64,7 @@ DETAILS
 Script Body
 ~~~~~~~~~~~
 
-Has 972 line(s). Calls functions:
+Has 1014 line(s). Calls functions:
 
  Script-Body
  |-- +Ftag::msg
@@ -104,6 +104,7 @@ Has 972 line(s). Calls functions:
  |   `-- +Ftag::msg
  |-- Ftag::is_git
  |-- Ftag::map-back
+ |-- Ftag::map-short
  |-- Ftag::open::with
  |   `-- Ftag::parse_format
  |       |-- Ftag::boxes
@@ -645,6 +646,7 @@ Uses feature(s): _setopt_
 Called by:
 
  Ftag::tag
+ Script-Body
 
 Ftag::open::with
 ~~~~~~~~~~~~~~~~
@@ -655,7 +657,7 @@ ____
  Prompt user to open file/directory with application
 ____
 
-Has 15 line(s). Calls functions:
+Has 16 line(s). Calls functions:
 
  Ftag::open::with
  `-- Ftag::parse_format
