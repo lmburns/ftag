@@ -14,6 +14,7 @@ FUNCTIONS
 ---------
 
  +Ftag::msg
+ -M
  @Ftag::sched
  Ftag::RG
  Ftag::autojump
@@ -30,6 +31,7 @@ FUNCTIONS
  Ftag::dua
  Ftag::dust
  Ftag::env_vars
+ Ftag::font
  Ftag::forgit
  Ftag::format_length
  Ftag::gitui
@@ -49,6 +51,7 @@ FUNCTIONS
  Ftag::show_keys
  Ftag::tag
  Ftag::toilet
+ Ftag::trace
  Ftag::twf
  Ftag::usage
  Ftag::vared-format
@@ -57,6 +60,9 @@ FUNCTIONS
  Ftag::zoxide
  Ftag::zstyle
  OS::notify
+ clear
+ col
+ consume_input
 
 DETAILS
 -------
@@ -64,7 +70,7 @@ DETAILS
 Script Body
 ~~~~~~~~~~~
 
-Has 1014 line(s). Calls functions:
+Has 1035 line(s). Calls functions:
 
  Script-Body
  |-- +Ftag::msg
@@ -90,6 +96,11 @@ Has 1014 line(s). Calls functions:
  |-- Ftag::dust
  |   `-- Ftag::dep
  |       `-- +Ftag::msg
+ |-- Ftag::font
+ |   |-- +Ftag::msg
+ |   |-- Ftag::ini::read
+ |   |   `-- +Ftag::msg
+ |   `-- Ftag::zstyle
  |-- Ftag::forgit
  |   |-- Ftag::is_git
  |   `-- OS::notify
@@ -128,6 +139,8 @@ Has 1014 line(s). Calls functions:
  |   |-- +Ftag::msg
  |   |-- Ftag::color-tag
  |   `-- Ftag::map-short
+ |-- Ftag::trace
+ |   `-- +Ftag::msg
  |-- Ftag::twf
  |-- Ftag::usage
  |   |-- +Ftag::msg
@@ -135,9 +148,11 @@ Has 1014 line(s). Calls functions:
  |   `-- Ftag::parallel
  |-- Ftag::wutag
  |-- Ftag::zstyle
- `-- OS::notify
-     `-- Ftag::dep
-         `-- +Ftag::msg
+ |-- OS::notify
+ |   `-- Ftag::dep
+ |       `-- +Ftag::msg
+ |-- clear
+ `-- col
 
 Uses feature(s): _export_, _read_, _setopt_, _trap_, _vared_, _zmodload_, _zparseopts_
 
@@ -164,12 +179,23 @@ Called by:
  Ftag::dep
  Ftag::dirstack
  Ftag::env_vars
+ Ftag::font
  Ftag::ini::read
  Ftag::lolcat
  Ftag::tag
  Ftag::toilet
+ Ftag::trace
  Ftag::usage
  Script-Body
+
+-M
+~~
+
+Has 36 line(s). Doesn't call other functions.
+
+Uses feature(s): _setopt_
+
+Not called by script or any function (may be e.g. a hook, a Zle widget, etc.).
 
 @Ftag::sched
 ~~~~~~~~~~~~
@@ -466,6 +492,29 @@ Uses feature(s): _setopt_
 
 Not called by script or any function (may be e.g. a hook, a Zle widget, etc.).
 
+Ftag::font
+~~~~~~~~~~
+
+____
+ 
+ FUNCTION: Ftag::font [[[
+ Get the current font of terminal and check if supports symbols
+____
+
+Has 37 line(s). Calls functions:
+
+ Ftag::font
+ |-- +Ftag::msg
+ |-- Ftag::ini::read
+ |   `-- +Ftag::msg
+ `-- Ftag::zstyle
+
+Uses feature(s): _setopt_, _vared_
+
+Called by:
+
+ Script-Body
+
 Ftag::forgit
 ~~~~~~~~~~~~
 
@@ -575,6 +624,7 @@ Uses feature(s): _read_, _setopt_
 
 Called by:
 
+ Ftag::font
  Script-Body
 
 Ftag::is_git
@@ -657,7 +707,7 @@ ____
  Prompt user to open file/directory with application
 ____
 
-Has 16 line(s). Calls functions:
+Has 18 line(s). Calls functions:
 
  Ftag::open::with
  `-- Ftag::parse_format
@@ -792,7 +842,7 @@ ____
  TODO: speed up
 ____
 
-Has 238 line(s). Calls functions:
+Has 241 line(s). Calls functions:
 
  Ftag::tag
  |-- +Ftag::msg
@@ -823,6 +873,26 @@ Called by:
 
  Ftag::parse_format
 
+Ftag::trace
+~~~~~~~~~~~
+
+____
+ 
+ FUNCTION: Ftag::trace [[[
+ Taken from powerlevel10k
+____
+
+Has 26 line(s). Calls functions:
+
+ Ftag::trace
+ `-- +Ftag::msg
+
+Uses feature(s): _read_
+
+Called by:
+
+ Script-Body
+
 Ftag::twf
 ~~~~~~~~~
 
@@ -849,7 +919,7 @@ ____
  Display typical help message
 ____
 
-Has 25 line(s). Calls functions:
+Has 31 line(s). Calls functions:
 
  Ftag::usage
  |-- +Ftag::msg
@@ -949,6 +1019,7 @@ Uses feature(s): _zstyle_
 
 Called by:
 
+ Ftag::font
  Script-Body
 
 OS::notify
@@ -971,4 +1042,51 @@ Called by:
  Ftag::copy::file
  Ftag::forgit
  Script-Body
+
+clear
+~~~~~
+
+____
+ 
+ FUNCTION: Ftag::clear [[[
+ Taken from powerlevel10k
+____
+
+Has 5 line(s). Calls functions:
+
+ clear
+
+Called by:
+
+ Script-Body
+
+col
+~~~
+
+____
+ 
+ FUNCTION: Ftag::format_length [[[
+ Could use to split lines based on $#COLUMN
+ TODO: add column base
+____
+
+Has 1 line(s). Doesn't call other functions.
+
+Called by:
+
+ Script-Body
+
+consume_input
+~~~~~~~~~~~~~
+
+____
+ 
+ ]]]
+____
+
+Has 5 line(s). Doesn't call other functions.
+
+Uses feature(s): _read_
+
+Not called by script or any function (may be e.g. a hook, a Zle widget, etc.).
 

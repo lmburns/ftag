@@ -22,6 +22,7 @@ prog="${0:A:t}"   prog_dir="${0:A:h}"
 # TODO: fix alignment if not part of mapping hash
 
 # TODO: add option for tag separator symbol
+# TODO: add full support for yaml
 # ]]] == END: Setup
 
 # SECTION: == Functions: Helper == [[[
@@ -73,6 +74,66 @@ function Ftag::dep() {
 # $@ - string of options; e.g., "h help"
 function Ftag::opts() {
   ( (( ${+opts[-${${(@s. .)@}[1]}]} || ${+opts[--${${(@s. .)@}[2]}]} )) ) && return 0
+}
+# ]]]
+
+# FUNCTION: Ftag::zstyle [[[
+# Wrapper function for zstyle
+function Ftag::zstyle() {
+  builtin zstyle $1 :ftag: ${@:2}
+}
+# ]]]
+
+# FUNCTION: Ftag::clear [[[
+# Taken from powerlevel10k
+function clear() {
+  if (( $+commands[clear] )) && command clear 2>/dev/null; then
+    return
+  fi
+  echoti clear 2>/dev/null
+  print -n -- "\e[H\e[2J\e[3J"
+}
+# ]]]
+
+function consume_input() {
+  local key
+  while true; do
+    [[ -t 2 ]]
+    read -t0 -k key || break
+  done 2>/dev/null
+}
+
+# FUNCTION: Ftag::trace [[[
+# Taken from powerlevel10k
+function Ftag::trace() {
+   # REALLY HAS NO USE FOR THIS PROGRAM
+  function hide_cursor() { (( $+terminfo[cnorm] )) || return; echoti civis 2>/dev/null; }
+  function show_cursor() { echoti cnorm 2>/dev/null; }
+
+  if (( $+terminfo[smcup] && $+terminfo[rmcup] )) && echoti smcup 2>/dev/null; then
+    function restore_screen() {
+      echoti rmcup 2>/dev/null
+      function restore_screen() {}
+    }
+  else
+    function restore_screen() {}
+  fi
+
+  print -Pr -- ''
+  # print -Pr -- '%b%k%f%u%s'
+  +Ftag::msg "{yell}=== stack trace (descending) ==={res}"
+  print -lr -- $funcfiletrace
+  +Ftag::msg "{yell}=== end  stack trace (descending) ==={res}"
+  print -Pr -- ''
+  print -Pr -- 'Press %BENTER%b to continue.'
+  hide_cursor
+  read -s
+  restore_screen
+  print
+  function quit() {}
+  stty echo 2>/dev/null
+  show_cursor
+  exit 1
 }
 # ]]]
 
@@ -164,7 +225,7 @@ function Ftag::ini::read() {
     return 1
   }
 
-  while read -r -t 1 __line; do
+  while read -r -t1 __line; do
     if [[ "$__line" = [[:blank:]]#\;* ]]; then
       continue
     elif [[ "$__line" = (#b)[[:blank:]]#\[([^\]]##)\][[:blank:]]# ]]; then
@@ -177,6 +238,57 @@ function Ftag::ini::read() {
   done < "$__ini_file"
 
   return 0
+}
+# ]]]
+
+# FUNCTION: Ftag::font [[[
+# Get the current font of terminal and check if supports symbols
+function Ftag::font() {
+  setopt extendedglob nowarncreateglobal
+  # Unsure how to test font if in tmux
+  # [[ $TERM_PROGRAM = iTerm* ]] && {
+  local PlistBuddy iterm_plist font ans
+  local -A out
+  iterm_plist="$HOME/Library/Preferences/com.googlecode.iterm2.plist"
+
+  [[ -x /usr/libexec/PlistBuddy ]] && PlistBuddy="/usr/libexec/PlistBuddy" || {
+    +Ftag::msg "{err}{yell}PlistBuddy{res} is not found"; return 1
+  }
+
+  [[ -r "$iterm_plist" ]] || {
+    +Ftag::msg "{err}$iterm_plist is not readable"; return 1
+  }
+
+  font=$($PlistBuddy -c "Print :'New Bookmarks:0:Normal Font'" $iterm_plist )
+
+  [[ ${${~__ftag[keyfile]}:e} = "ini" ]] && { Ftag::ini::read "$~__ftag[keyfile]" out }
+
+  # Manually set you have nerd font
+  [[ $(command yq e ".nerd_font" $__ftag[keyfile] 2>/dev/null) = 1 ||
+     ${(v)out[(I)*nerd_font*]} -eq 1 ||
+     $FTAG_NERDFONT -eq 1 ]] ||
+     { Ftag::zstyle -t nerd_font 1 } && \
+       return 0
+
+  # Prompt for nerd font
+  if [[ "$font" = (#b)(*Nerd*)[[:blank:]](<->) ]] || {
+    vared -cp "Can you see these arrows?  [Y/n] >> " ans && [[ $ans = (#i)y(es|) ]]
+  }; then
+    {
+        [[ $__ftag[keyfile] != "${prog_dir}/ftag" ]] && {
+          # What to do if no keyfile?
+          # TODO: switch to keyfile only
+          [[ ${${~__ftag[keyfile]}:e} = y(a|)ml ]] && command yq e ".nerd_font += 1" -i $~__ftag[keyfile]
+          [[ ${${~__ftag[keyfile]}:e} = "ini" ]] && print -n "\n[nerd_font]\nhas = 1" >> $~__ftag[keyfile]
+        }
+    } always {
+        __ftag[nerd_font]=1
+    }
+    return 0
+  else
+    __ftag[nerd_font]=0
+    return 1
+  fi
 }
 # ]]]
 
@@ -426,11 +538,10 @@ function Ftag::tag() {
   case $VERBOSE in
     ( <1-> )
       +Ftag::msg "{brred}${(l:COLUMNS::=:):-}{res}" \
-          "{bgreen}Command:{res} tag -${__action} ${fargs[2]:-} ${fargs[3]:-}" ;|
-    ( <2-> )
+          "{bgreen}Command:{res} tag -${__action} ${fargs[2]:-} ${fargs[3]:-}"
       +Ftag::msg "{brblue}${(l:COLUMNS::=:):-}{res}" \
-         "{bgreen}Length:{res} $#fargs" ;|
-    ( <3-> )
+          "{bgreen}Length:{res} $#fargs" ;|
+    ( <2-> )
       # Call this here as well as usage above so it's only called when needed
       () {
         builtin emulate -LR zsh -o extendedglob
@@ -442,8 +553,12 @@ function Ftag::tag() {
         print -c -- ${FTAG[bold]}${(n)gtags}
         +Ftag::msg "{res}{brblue}${(l:COLUMNS::=:):-}{res}" \
             "{bgreen}Local tags:{res}"
-        print -c -- ${FTAG[bold]}${(n)ltags}
-      }
+        print -c -- ${FTAG[bold]}${(n)ltags}${FTAG[res]}
+      } ;|
+    ( <3-> )
+      +Ftag::msg "{brblue}${(l:COLUMNS::=:):-}{res}" \
+          "{bgreen}Stack Trace:{res}"
+      print -lr -- $funcfiletrace
       ;;
   esac
 }
@@ -455,13 +570,6 @@ function OS::notify() {
   { Ftag::dep "terminal-notifier" } && {
       terminal-notifier -title "${2:-Ftag}" -message "${1:-.}"
   } || osascript -e 'display notification "'"$*"'"'
-}
-# ]]]
-
-# FUNCTION: Ftag::zstyle [[[
-# Wrapper function for zstyle
-function Ftag::zstyle() {
-  builtin zstyle $1 :ftag: ${@:2}
 }
 # ]]]
 
@@ -519,6 +627,10 @@ function @Ftag::sched() {
 
 # FUNCTION: Ftag::format_length [[[
 # Could use to split lines based on $#COLUMN
+# TODO: add column base
+function col() { return 'COLUMNS > 90 ? 1 : 0' }
+function -M col
+local colz='col()'
 function Ftag::format_length() {
   builtin emulate -LR zsh
   setopt extendedglob warncreateglobal typesetsilent noshortloops
@@ -740,8 +852,8 @@ function Ftag::gpg() {
   local tmpfile
   zparseopts -a opts -D ${(s::):-e}
   zmodload -Fa zsh/files b:zf_rm b:zf_mv
-  # gpg-tui --select key_id
   # TODO: add option for multiple files
+  # gpg-tui --select key_id
   trap "zf_rm -f $tmpfile >/dev/null" EXIT INT TERM
   tmpfile="${TMPDIR:-/tmp}/ftag.dump.$RANDOM"
   mime=( ${(@s./.)${(f)$(file --mime-type --brief "${(z)@}")}} )
@@ -751,7 +863,7 @@ function Ftag::gpg() {
   if [[ -n "${matched}" ]] && (( ${+opts[(r)-e]} )) {
     gpg -dq "${(z)@}" > "$tmpfile"
     "${EDITOR:-vim}" "$tmpfile"
-    gpg -eq "$tmpfile"
+    gpg -e -r $(gpg-tui --select key_id) "$tmpfile"
     [[ -f "${tmpfile}.asc" ]] && zf_mv "${tmpfile}.asc" "${(z)@}"
     [[ -f "${tmpfile}.gpg" ]] && zf_mv "${tmpfile}.gpg" "${(z)@}"
     zf_rm -f "$tmpfile"
@@ -764,7 +876,7 @@ function Ftag::gpg() {
     "${EDITOR:-vim}" "${(z)@}"
   # If decrypted, encrypt it
   } else {
-    gpg -eq "${(z)@}"
+    gpg -e -r $(gpg-tui --select key_id) "${(z)@}"
     [[ -f "${(z)@}.asc" ]] && zf_mv "${(z)@}.asc" "${(z)@}"
     [[ -f "${(z)@}.gpg" ]] && zf_mv "${(z)@}.gpg" "${(z)@}"
   }
@@ -915,12 +1027,15 @@ function Ftag::glow() {
 # Prompt user to open file/directory with application
 function Ftag::open::with() {
   emulate -L zsh -o extendedglob
-  local app choice
+  local app choice symb
   local -a apps=( ${(f)"$(command ls /Applications)"} )
   apps+=( ${(f)"$(command ls /System/Applications)"} )
 
   Ftag::parse_format "open with"
-  local symb="${${${(M)${langinfo[CODESET]:-$LANG}:#(#i)*UTF-8*}:→}:-=>}"
+  # Has to pass two checks
+  [[ $__ftag[nerd_font] -eq 1 ]]  &&
+    symb="${${${(M)${langinfo[CODESET]:-$LANG}:#(#i)*UTF-8*}:+→}:-=>}" ||
+    symb="=>"
   vared -cp "Type '${FTAG[bryell]}app${FTAG[res]}' to list applications \
     ${FTAG[nl]}Open with $symb " app
   [[ $app = app ]] && choice=$(builtin print -rl $apps | fzf +m --no-height --prompt="App $symb " ) || {
@@ -956,14 +1071,14 @@ function Ftag::default_header() {
 # FUNCTION: Ftag::boxes [[[
 # Format header display from CLI
 function Ftag::boxes() {
-  (( ${+commands[boxes]} )) && boxes -d tex-box || {
+  (( $+commands[boxes] )) && boxes -d tex-box || {
     cat; +Ftag::msg "{warn}{green}boxes{res} is required to use this feature{res}"
   }
 }
 # ]]]
 # FUNCTION: Ftag::lolcat [[[
 function Ftag::lolcat() {
-  (( ${+commands[lolcat]} )) && lolcat || {
+  (( $+commands[lolcat] )) && lolcat || {
     cat; +Ftag::msg "{warn}{green}lolcat{res} is required to use this feature{res}"
   }
 }
@@ -972,7 +1087,7 @@ function Ftag::lolcat() {
 function Ftag::toilet() {
   # smblock smmono12
   # toilet -f smmono12 -F border --filter gay
-  (( ${+commands[toilet]} )) && {
+  (( $+commands[toilet] )) && {
     toilet -d "${prog_dir}/../fonts" -f ansi_shadow --gay "${(j. .)@}"
   } || {
     cat; +Ftag::msg "{warn}{green}toilet{res} is required to use this feature{res}"
@@ -1049,16 +1164,14 @@ function Ftag::vared::formatter() {
 function Ftag::usage() {
   emulate -LR zsh
   builtin setopt extendedglob noshortloops noksharrays rcquotes
-  Ftag::default_header -s "ftag" -c 13
+  # Probably a better way to do this other than != -h
+  [[ $1 != -h ]] && Ftag::default_header -s "ftag" -c 13
   +Ftag::msg "{bred}USAGE:{res}"
-  +Ftag::msg "{tb}{brcyan}ftag{res} {brmagen}[wsh]{res} {green}<tag>{res}" \
+  +Ftag::msg "{tb}{brcyan}ftag{res} {brmagen}[flag]{res} {green}<tag>{res}" \
              "{nl}{tb}{green}ftag{res} is an FZF TUI for jdberry's {green}tag{res} on macOS" \
-             "{nl}{tb}It uses {yell}figlet{res} by default to display headers, though it is not needed" \
-             "{nl}{tb}{green}<tag>{res} is an optional argument, and if used it must be exact. There" \
-             "{nl}{tb}are zsh completions to help complete tags. For a fuzzy search, use the {green}--q{res} flag"
+             "{nl}{tb}It uses {yell}figlet{res} by default to display headers, though it is not needed"
   +Ftag::msg "{bred}FLAGS:{res}"
 
-  # Fix these to be one command
   integer longest=0
   local k v
   for k (${(@ok)__FTAG_OPTS}) { (( $#k > $longest )) && longest=$#k }
@@ -1069,12 +1182,19 @@ function Ftag::usage() {
       ${${__FTAG_OPTS[$k]}//(#b)(${(~j:|:)__FTAG_EXTERNAL_OPTS}|-[a-z]##) /${FTAG[yell]}${match[1]}${FTAG[res]} }
   done
 
-  +Ftag::msg "{tb}If a tag is searched for (optional argument), it must be last. Figlet is ran if" \
-             "{nl}{tb}toilet isn't specified and vice-versa. The default printing (no flags specified" \
-             "{nl}{tb}and figlet installed) looks the nicest. Parameters requiring arguments can be used" \
-             "{nl}{tb}with an equals sign (e.g., --path=)"
-  +Ftag::msg "{bred}INSIDE FZF:{res}"
-  Ftag::parallel "Ftag::show_keys"
+  local dot
+  [[ $__ftag[nerd_font] -eq 1 ]]  &&
+    dot="${${${(M)${langinfo[CODESET]:-$LANG}:#(#i)*UTF-8*}:+}:--}" ||
+    dot="-"
+  +Ftag::msg "{tb}{yell}$dot{res} If a {green}tag{res} is searched for, it must be last and it must be {und}exact{res} ({yell}-q{res} for fuzzy matching)" \
+             "{nl}{tb}{yell}$dot{res} Figlet is ran if toilet isn't specified and vice-versa" \
+             "{nl}{tb}{yell}$dot{res} The default printing (no flags specified and figlet installed) looks the nicest" \
+             "{nl}{tb}{yell}$dot{res} Parameters requiring arguments can be used with an equal sign (e.g., --path=)"
+
+  [[ $1 != -h ]] && {
+    +Ftag::msg "{bred}INSIDE FZF:{res}"
+    Ftag::parallel "Ftag::show_keys"
+  }
 }
 # ]]]
 
@@ -1116,7 +1236,7 @@ local -a __FTAG_EXTERNAL_OPTS
 __FTAG_EXTERNAL_OPTS=(
     wutag zoxide autojump lolcat toilet boxes tag fzf glow lazygit gitui gpg
     dua twf dotbare forgit rg bat ftag less pbcopy ctrl alt lf ranger xplr exa
-    dragon dust rclone rsync vitag tokei ffsend
+    dragon dust rclone rsync vitag tokei ffsend 'p|pager'
 )
 
 local -A __FTAG_OPTS
@@ -1195,8 +1315,8 @@ __FTAG_ENVIRONVARS=(
     FTAG_DIR_PREV                                   'Fzf preview for directories (default: exa)'
     FTAG_KEYFILE                                    'File of keybinding configuration (-g|--genconfig will generate an example $XDG_CONFIG_HOME/ftag/config)'
     FTAG_DIR_MAP                                    'File of directory mappings for the %shortening'
-    FTAG_COLORS                                     'List of no more than 3 colors to colorize output'
     "zstyle ':ftag:' key-file <location>"           'Alternative way to specify configuration (this has higher priority)'
+    "zstyle ':ftag:' colors <colors>"               'Specify no more than 3 colors for output'
     "zstyle ':ftag:' fzf-command fzf_command <cmd>" 'Alternate fzf command (e.g., fzf-tmux)'
     "zstyle ':ftag:' fzf-bindings bind <bindings>"  'List of additional fzf bindings (not actions), e.g., alt-shift-up:preview-up'
     "zstyle ':ftag:' fzf-flags <flags>"             'Additional fzf flags to main command'
@@ -1207,37 +1327,7 @@ __FTAG_ENVIRONVARS=(
     "zstyle ':ftag:' copy-cmd <cmd>"                'Alternative way to specify FTAG_COPY (higher priority)'
     "zstyle ':ftag:' pager <cmd>"                   'Alternative way to specify FTAG_PAGER (higher priority)'
     "zstyle ':ftag:' file-manager <fm>"             'Alternative way to specify FTAG_FILEMANAGER (higher priority)'
-    "zstyle ':ftag:' colors <colors>"               'Alternative way to specify FTAG_COLORS (higher priority)'
 )
-# ]]]
-
-# SECTION: == Imports / Setting Variables == [[[
-zmodload -Fa zsh/zutil b:zparseopts \
-  || { +Ftag::msg "{err}{green}zsh/zutil{res} is required to use this program{res}"; exit 1; }
-
-zmodload -Fa zsh/parameter p:commands p:parameters \
-  || { +Ftag::msg "{err}{green}zsh/parameter{res} is requred to use this program{res}"; exit 1; }
-
-zmodload -Fa zsh/langinfo p:langinfo \
-  || [[ -n "$LANG" ]] \
-  || +Ftag::msg "{warn}{green}zsh/langinfo{res} is recommended to use this program{res}"
-
-# tput $COLUMNS
-zmodload zsh/terminfo 2>/dev/null
-zmodload zsh/termcap 2>/dev/null
-
-# a all = not used
-# Set query as optional args to prevent errors
-local -A opts
-local -a cfont sort wtag query verbose optpath ccolor config dump
-typeset -gaH wrapper
-# FIX: error is never hit
-zparseopts -D -A opts h -help b -boxes T -lolcat t -toilet g -genconfig \
-    l -local z -zoxide j -jump n -nocolor N -nofzf {d,-dump}::=dump {W,-wrapper}:=wrapper \
-    {f,-font}::=cfont {p,-path}:=optpath {q,-query}::=query {C,-color}:=ccolor \
-    {c,-config}:=config {w,-wutag}+=wtag {s,-sort}::=sort {v,-verbose}+=verbose || {
-      Ftag::usage; exit 1;
-    }
 
 typeset -gAH FTAG
 FTAG=(
@@ -1266,6 +1356,49 @@ __FTAG_ANSI=(
   cyan  "$fg_no_bold[cyan]"    bcyan  "$fg_bold[cyan]"    bgcyan  "$bg[cyan]"
   res   "$reset_color"
 )
+# ]]]
+
+# SECTION: == Imports / Setting Variables == [[[
+# Most of these should be loaded by default
+zmodload -Fa zsh/zutil b:zparseopts \
+  || { +Ftag::msg "{err}{green}zsh/zutil{res} is required to use this program{res}"; exit 1; }
+
+zmodload -Fa zsh/parameter p:commands p:parameters \
+  || { +Ftag::msg "{err}{green}zsh/parameter{res} is requred to use this program{res}"; exit 1; }
+
+zmodload -Fa zsh/zle b:vared \
+  || { +Ftag::msg "{err}{green}zsh/zle{res} is requred to use this program{res}"; exit 1; }
+
+zmodload -Fa zsh/langinfo p:langinfo \
+  || [[ -n "$LANG" ]] \
+  || +Ftag::msg "{warn}{green}zsh/langinfo{res} is recommended to use this program{res}"
+
+# tput $COLUMNS
+zmodload zsh/terminfo 2>/dev/null
+zmodload zsh/termcap 2>/dev/null
+
+# a all = not used
+# Set query as optional args to prevent errors
+local -A opts
+local -a avai_opts cfont sort wtag query verbose optpath ccolor config dump
+typeset -gaH wrapper
+avai_opts=( ${${(@s:, :)${(k)__FTAG_OPTS}}//<*>/} )
+# argv[@] tested before zparse captures all args
+# argv[@] tested after zparse captures args not in zparse
+zparseopts -D -A opts h -help b -boxes T -lolcat t -toilet g -genconfig \
+    l -local z -zoxide j -jump n -nocolor N -nofzf {d,-dump}::=dump {W,-wrapper}:=wrapper \
+    {f,-font}::=cfont {p,-path}:=optpath {q,-query}::=query {C,-color}:=ccolor \
+    {c,-config}:=config {w,-wutag}+=wtag {s,-sort}::=sort {v,-verbose}+=verbose
+
+# Catch wrong flags; :* leaves only matching flags
+# [[ -n "$argv[@]" && -z ${avai_opts:*argv} ]] && {
+#   +Ftag::msg "{err}{yell}$argv[@]{res} is an invalid flag"
+#   builtin print
+#   Ftag::usage -h
+#   exit 1
+# }
+
+# OS::notify "x $argv[@]"
 
 Ftag::opts "h help" && {
   Ftag::usage
@@ -1274,6 +1407,7 @@ Ftag::opts "h help" && {
 
 local figlet
 Ftag::dep -e "tag"
+Ftag::dep -e "yq"
 Ftag::dep "figlet" && figlet="figlet" || figlet="cat"
 
 # Has to be global when program is sourced on second loop
@@ -1317,7 +1451,7 @@ export LESS="-r $LESS"
   trap 'path=( "${path[@]:#/usr/local/bin}" )' INT EXIT
 }
 
-[[ -n $ZPFX && ${path[(I)$ZPFX/bin]} -ne 0 ]] && {
+[[ -n $ZPFX && ${path[(I)$ZPFX/bin]} -eq 0 ]] && {
   path+=( "$ZPFX/bin" )
   trap 'path=( "${path[@]:#$ZPFX/bin}" )' INT EXIT
 }
@@ -1389,9 +1523,10 @@ export LESS="-r $LESS"
 
   # Precedence of configuration
   # key-file | FTAG_KEYFILE => zstyle => environment variables
-  Ftag::zstyle -s fzf-command       ${ph::=__ftag[fzf_command]} || : ${__ftag[fzf_command]::=fzf}
-  Ftag::zstyle -a fzf-bindings      bind                        && __ftag[extra_binds]+=,${(j:,:)bind}
-  Ftag::zstyle -a fzf-flags         fzf_flags                   && : ${__ftag[fzf_flags]::=${(j: :)fzf_flags}}
+  Ftag::zstyle -s colors        ${ph::=__ftag[colors]}      || : ${__ftag[colors]::=${(As: :):-bmagen blue green}}
+  Ftag::zstyle -s fzf-command   ${ph::=__ftag[fzf_command]} || : ${__ftag[fzf_command]::=fzf}
+  Ftag::zstyle -a fzf-bindings  bind                        && __ftag[extra_binds]+=,${(j:,:)bind}
+  Ftag::zstyle -a fzf-flags     fzf_flags                   && : ${__ftag[fzf_flags]::=${(j: :)fzf_flags}}
 
   Ftag::zstyle -s fzf-file-preview ${ph::=__ftag[file_prev]} || : ${__ftag[file_prev]::=${FTAG_FILE_PREV:-bat --style=numbers --color=always}}
   Ftag::zstyle -s fzf-dir-preview  ${ph::=__ftag[dir_prev]}  || \
@@ -1402,8 +1537,10 @@ export LESS="-r $LESS"
   Ftag::zstyle -s copy-cmd         ${ph::=__ftag[copy_cmd]} || : ${__ftag[copy_cmd]::=${FTAG_COPY:-pbcopy}}
   Ftag::zstyle -s pager            ${ph::=__ftag[pager]}    || : ${__ftag[pager]::=${FTAG_PAGER:-${${${commands[bat]}:+bat --paging=always -f}:-less}}}
   Ftag::zstyle -s file-manager     ${ph::=__ftag[fmngr]}    || : ${__ftag[fmngr]::=${FTAG_FILEMANAGER:-${commands[lf]:-${commands[ranger]}:-${commands[xplr]}}}}
-  Ftag::zstyle -s colors           ${ph::=__ftag[colors]}   || : ${__ftag[colors]::=${FTAG_COLORS:-${(As: :):-bmagen blue green}}}
-  Ftag::zstyle -s key-file         ${ph::=__ftag[keyfile]}  || : ${__ftag[keyfile]::=${FTAG_KEYFILE:-${0:A:h}/ftag}}
+  Ftag::zstyle -s key-file         ${ph::=__ftag[keyfile]}  || : ${__ftag[keyfile]::=${FTAG_KEYFILE:-${prog_dir}/ftag}}
+  # Ftag::zstyle -s key-file         ${ph::=__ftag[keyfile]}  || : ${__ftag[keyfile]::=${FTAG_KEYFILE:-${keyfile}}}
+
+  Ftag::font
 
   # CLI specification trumps zstyle
   [[ -n "$conf" ]] && __ftag[keyfile]="$conf"
@@ -1453,6 +1590,7 @@ export LESS="-r $LESS"
   : ${FTAG_ACTIONS[ACTION_RELOAD]:=reload(env _FZFTAG_INTERNAL=reload "$prog")}
   : ${FTAG_ACTIONS[ACTION_PREVIEW]:=toggle-preview}
   : ${FTAG_ACTIONS[ACTION_HELP]:=execute(env _FZFTAG_SHOW=keys "$prog" | "${(z)__ftag[pager]}" )"${(z)FTAG_PRINT}"}
+  : ${FTAG_ACTIONS[ACTION_STACKTRACE]:=execute(env FZFTAG_ACTION=stacktrace "$prog" \{+f\} "${(z)TTY_REDIRECTION}")"${(z)FTAG_PRINT}"}
   : ${FTAG_ACTIONS[ACTION_QUIT]:=abort}
 
   : ${FTAG_ACTIONS[ACTION_TOGGLE_DOWN]:=toggle+down}
@@ -1503,11 +1641,14 @@ export LESS="-r $LESS"
   : ${FTAG_KEYBINDINGS[P]:=$FTAG_ACTIONS[ACTION_PREVIEW]}
   : ${FTAG_KEYBINDINGS[Q]:=$FTAG_ACTIONS[ACTION_QUIT]}
   : ${FTAG_KEYBINDINGS[esc]:=$FTAG_ACTIONS[ACTION_QUIT]}
+  : ${FTAG_KEYBINDINGS[${__ftag[fzf_mod]}-q]:=$FTAG_ACTIONS[ACTION_STACKTRACE]}
   : ${FTAG_KEYBINDINGS[?]:=$FTAG_ACTIONS[ACTION_HELP]}
 
   : ${FTAG_KEYBINDINGS[${__ftag[fzf_mod]}-s]:=$FTAG_ACTIONS[ACTION_TWF_SWITCH]}
 
-  [[ $~__ftag[keyfile] != "${0:A:h}/ftag" ]] && {
+  # __ftag[keyfile]="$XDG_CONFIG_HOME/ftag/config.ini"
+
+  [[ $~__ftag[keyfile] != "${prog_dir}/ftag" ]] && {
     [[ ! -r $~__ftag[keyfile] ]] && { +Ftag::msg "{err}${~__ftag[keyfile]} is not readable; aborting ..."; exit 1; }
     local -a match mbegin mend
     local -A out
@@ -1541,6 +1682,10 @@ export LESS="-r $LESS"
         # Specify new key to prevent having 3+ colors
         __ftag[kcolors]+="${(Av)out[$k]} "
       }
+
+      [[ "$k" = \<nerd_font\>* ]] && {
+        __ftag[nerd_font]="${(Av)out[$k]}"
+      }
     done
   }
 
@@ -1561,8 +1706,11 @@ export LESS="-r $LESS"
     }
   }
 
-  (( $#ccolor > 3 ))       && {
-    local dot="${${${(M)${langinfo[CODESET]:-$LANG}:#(#i)*UTF-8*}:+}:--}"
+  (( $#ccolor > 3 )) && {
+    local dot
+  [[ $__ftag[nerd_font] -eq 1 ]]  &&
+      dot="${${${(M)${langinfo[CODESET]:-$LANG}:#(#i)*UTF-8*}:+}:--}" ||
+      dot="-"
     +Ftag::msg "{err}specify no more than 3 colors." \
       "{nl}  $dot {bmagen}Color 1{res} = tags" \
       "{nl}  $dot {blue}Color 2{res} = tag separator" \
@@ -1588,7 +1736,7 @@ export LESS="-r $LESS"
       for k (${(@ok)__ftag})             { (( $#k > $long )) && long=$#k; }
 
       # for f (${(@k)FTAG_KEYBINDINGS} ${(@k)FTAG_ACTIONS} ${(@k)^^__ftag[map__*]}) { (( $#k > $long )) && long=$#k; }
-      adj=$(( ${#${:-key__}} + ${#FTAG[red]} * 2 + ${#FTAG[res]} * 2 ))
+      adj=$(( ${#FTAG[red]} + ${#FTAG[brcyan]} + ${#FTAG[res]} * 2 ))
 
       +Ftag::msg "{red}${(l:COLUMNS::=:):-}{res}"
       +Ftag::msg "{bgreen}${(l:COLUMNS/2:: :):-${FTAG[und]}KEYBINDINGS}{res}"
@@ -1628,19 +1776,22 @@ export LESS="-r $LESS"
         } || print -rn -- "${FTAG[red]}${(r:long+adj:: :)k}${FTAG[res]} $SHORT"
         print
       done
-    } | ${${${(M)${${${dump##-(d|-dump(=|))}[-1]}//=/}:#(p|pager)}:+${(z)__ftag[pager]}}:-cat}
+    } | ${${${(M)${${${(@Aw)dump##-(d|-dump(=|))}[-1]}//=/}:#(p|pager)}:+${(z)__ftag[pager]}}:-cat}
 
-    [[ -z ${(M)${${${dump##-(d|-dump(=|))}[-1]}//=/}:#(p|pager)} ]] && {
-      +Ftag::msg "{warn}use {yell}p{res} or {yell}pager{res} (no hyphens)"
+    [[ -z ${(M)${${${(@Aw)dump##-(d|-dump(=|))}[-1]}//=/}:#(p|pager)} && -n "${dump##-(d|-dump(=|))}" ]] && {
+      +Ftag::msg "{nl}{warn}{red}${dump##-(d|-dump(=|))}{res} is not an option" \
+        "{nl}Use {yell}p{res} or {yell}pager{res} (no hyphens)"
     }
     exit 0
   }
 
   Ftag::opts "g genconfig" && {
-    local ans
+    local ans symb
     [[ ! -d $keyfile:h ]] && { zf_mkdir -p $~keyfile:h || +Ftag::msg "{err}could not create ftag configuration directory"; exit 1; }
     [[ -f $keyfile ]] && {
-      local symb="${${${(M)${langinfo[CODESET]:-$LANG}:#(#i)*UTF-8*}:→}:->>}"
+      [[ $__ftag[nerd_font] -eq 1 ]]  &&
+        symb="${${${(M)${langinfo[CODESET]:-$LANG}:#(#i)*UTF-8*}:+→}:-=>}" ||
+        symb="=>"
       vared -cp "${FTAG[red]}Configuration already exists.${FTAG[res]} Generate another? [Y/n] $symb " ans
       [[ $ans != (#i)y(es|) ]] && { +Ftag::msg "{bryell}Configuration not generated{res}"; exit 0; }
     }
@@ -1715,7 +1866,6 @@ FTAG_ALT         = alt
 FTAG_FILEMANAGER = lf
 FTAG_FILE_PREV   = bat --style=numbers --color=always
 FTAG_DIR_PREV    = exa -TL 3
-FTAG_COLORS      =
 
 [fzf]
 fzf_command  = fzf
@@ -1725,7 +1875,10 @@ fzf_bindings = alt-shift-down:preview-down,alt-shift-up:preview-up
 [colors]
 color_1 = bmagen
 color_2 = blue
-color_3 = green" >! "${~keyfile}"
+color_3 = green
+
+[nerd_font]
+has = 0" >! "${~keyfile}"
 
     +Ftag::msg "{brgreen}Configuration generated:{res} {yell}${~keyfile}{res}"
     exit 0
@@ -2060,6 +2213,9 @@ if [[ -n "$FZFTAG_ACTION" ]]; then
       ;;
     (copy-file)
       Ftag::copy::file "$reply"
+      ;;
+    (stacktrace)
+      Ftag::trace
       ;;
   esac
   clear
