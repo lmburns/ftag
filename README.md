@@ -12,7 +12,7 @@ FLAGS:
         -W, --wrapper <cmds>     No fzf, but is a wrapper and can use tag commands
         -b, --boxes              Add a box around header with boxes
         -c, --config <conf>      Specify configuration file
-        -d, --dump               Dump configuration (mappings, actions, keyfile)
+        -d, --dump               Dump configuration (mappings, actions, keyfile). Optional parameter of p|pager (no hyphen) to view in pager
         -f, --font <font>        Use custom font with figlet (some are provided)
         -h, --help               Display this help message
         -j, --jump               Use autojump to select directory to use tags (only shows tagged files)
@@ -24,11 +24,12 @@ FLAGS:
         -t, --toilet             Color and format the header with toilet
         -v, --verbose            Display verbosity (-vvv is max; only used with wrapper as of now)
         -w, --wutag              Also tag files with wutag (-ww only uses wutag)
+        -x, --xtrace             Most useful with wrapper
         -z, --zoxide             Use zoxide to select directory to use tags (only shows tagged files)
-         If a tag is searched for (optional argument), it must be last. Figlet is ran if
-         toilet isn't specified and vice-versa. The default printing (no flags specified
-         and figlet installed) looks the nicest. Parameters requiring arguments can be used
-         with an equals sign (e.g., --path=)
+         - If a tag is searched for, it must be last and it must be exact (-q for fuzzy matching)
+         - Figlet is ran if toilet isn't specified and vice-versa
+         - The default printing (no flags specified and figlet installed) looks the nicest
+         - Parameters requiring arguments can be used with an equal sign (e.g., --path=)
 ```
 
 ### Keybindings within `ftag`
@@ -56,10 +57,14 @@ INSIDE FZF:
         I       Open gitui/lazygit if directory is a git-dir  ACTION_GIT
         J       Switch to autojump query to select path to list tags  ACTION_AUTOJUMP
         L       Switch to local mode (i.e., current directory)  ACTION_LOCAL
-        M-c     Copy/move/rsync/backup file or directory  ACTION_COPY_FILE
-        M-d     Be propted to delete file  ACTION_DELETE
+        M-c     Copy/move/rsync/rclone/backup file or directory  ACTION_COPY_FILE
+        M-d     Be prompted to delete file  ACTION_DELETE
+        M-f     Use ffsend to upload file(s)  ACTION_FFSEND
+        M-i     View director(y|ies) stats with tokei  ACTION_TOKEI
         M-p     Open a popup window to copy file with dragon  ACTION_DRAGON_SOURCE
         M-s     View directory size in dust  ACTION_DUST
+        M-t     Open directory in vitag to edit tags  ACTION_VITAG
+        M-w     Prompted with what to open file/dir with  ACTION_OPEN_WITH
         O       Open file in external program based on extension  ACTION_OPEN
         P       Toggle preview of file or directory  ACTION_PREVIEW
         Q       Quit ftag  ACTION_QUIT
@@ -111,6 +116,13 @@ File of keybinding configuration (`-g`|`--genconfig` will generate an example at
 
 ```sh
 zstyle ":ftag:" key-file <file_path>
+```
+
+#### `FTAG_NERDFONT`
+Set to `1` if your terminal supports Nerd Font symbols, or `0` if not. The same can be done in the configuration file under the section `nerd_font`, as well as using the `zstyle` below.
+
+```sh
+zstyle ":ftag:" nerd_font <1|0>
 ```
 
 #### `FTAG_DIR_MAP`
@@ -228,8 +240,15 @@ source ~/<custom_location>/ftag.plugin.zsh
 
 ### TODO
 
+* Catch error on invalid flag
 * Confirm support for file paths with spaces
+* Fix alignment of output if path is not part of the mapping hash
 * Find a way to display hidden tagged files
-* Fix alignment if not part of mapping hash
+* Use `langinfo`, etc for all arrow symbols
+
 * Add option for tag separator symbol
 * Add option to permanently set notifications
+* Add full support for yaml
+* Switch to keyfile only (no support without one)
+* Possibly use a cache file (use `sqlite3`)
+* Submit `fzf` bug, regarding how `TUI` programs that are written in `go` work just fine, but ones written in `rust` do not

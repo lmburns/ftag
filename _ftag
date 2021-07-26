@@ -48,7 +48,8 @@ arguments=(
   {-N,--nofzf}'[Do not use fzf. This has limited functionality; pretty much for pretty-printing]'
   {-s,--sort}'[Sort tags ascending or descending]:== Sort output ==:((d\:descending desc\:descending ++\:descending a\:ascending asc\:ascending +\:ascending))'
   {-W,--wrapper}'[Use ftag as a wrapper to tag to have colored output]'
-    {-d,--dump}'[Dump configuration variables]:== Dump config ==:((p\:"pipe to pager" pager\:"pipe to pager"))'
+  {-x,--xtrace}'[Extremely verbose output to help with debugging]'
+  {-d,--dump}'[Dump configuration variables]:== Dump config ==:((p\:"pipe to pager" pager\:"pipe to pager"))'
 )
 
 _arguments "${_arg_opts[@]}" $arguments \

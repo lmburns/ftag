@@ -23,6 +23,7 @@ prog="${0:A:t}"   prog_dir="${0:A:h}"
 
 # TODO: add option for tag separator symbol
 # TODO: add full support for yaml
+# TODO: catch error on invalid flag
 # ]]] == END: Setup
 
 # SECTION: == Functions: Helper == [[[
@@ -610,18 +611,23 @@ function Ftag::parallel() {
 # ]]]
 
 # FUNCTION: @Ftag::sched [[[
+# Scheduler: has to be sourced, can't run as script for whatever reason
+# Figure this out
 function @Ftag::sched() {
-  zmodload -Fa zsh/sched b:sched
   local AFD
-  # sched +0 'Ftag::tag "${wrapper}"'
-  sched +1 'Ftag::tag "${(z)tag_arguments}"'
-  # sched +1 'echo "hi"'
+
+  sched +1 "${(z)@}"
 
   AFD=13371337
   exec {AFD}< <(LANG=C command sleep 0.002; builtin print run;)
   command true
   zle -F "$AFD" @Ftag::sched
   zle -F "$AFD" 2>/dev/null
+
+  # local 0=${(%):-%N}
+  # add-zsh-hook -d -- precmd $0
+  # unfunction $0
+  # add-zsh-hook -- precmd @Ftag::sched "echo hi"
 }
 # ]]]
 
@@ -854,7 +860,7 @@ function Ftag::gpg() {
   zmodload -Fa zsh/files b:zf_rm b:zf_mv
   # TODO: add option for multiple files
   # gpg-tui --select key_id
-  trap "zf_rm -f $tmpfile >/dev/null" EXIT INT TERM
+  trap "zf_rm -f $tmpfile >/dev/null" EXIT TERM
   tmpfile="${TMPDIR:-/tmp}/ftag.dump.$RANDOM"
   mime=( ${(@s./.)${(f)$(file --mime-type --brief "${(z)@}")}} )
   matched=${(M)mime[@]:#(#i)*pgp-encrypted*}
@@ -1129,8 +1135,7 @@ function Ftag::parse_format() {
 # FUNCTION: Ftag::vared::formatter [[[
 # Display tags for 'vared' in the main loop
 #             
-#  ❱ ❯  ⎣1⎤ ❪1❫ ⟦1⟧  ◂▸
-# (->|=>|→)
+#  ❱ ❯  ⎣1⎤ ❪1❫ ⟦1⟧  ◂▸ →
 function Ftag::vared::formatter() {
   builtin emulate -LR zsh
   setopt extendedglob noshortloops warncreateglobal
@@ -1260,11 +1265,13 @@ __FTAG_OPTS=(
     "-c, --config <conf>"  "Specify configuration file"
     "-d, --dump"           "Dump configuration (mappings, actions, keyfile). Optional parameter of p|pager (no hyphen) to view in pager"
     "-v, --verbose"        "Display verbosity (-vvv is max; only used with wrapper as of now)"
+    "-x, --xtrace"         "Most useful with wrapper"
 )
 
 local -A __FTAG_KEYBINDINGS
 __FTAG_KEYBINDINGS=(
     A   "Add/append tags -- ACTION_ADD"
+    C   "Cd to directory -- ACTION_CD"
     D   "Delete/remove tags -- ACTION_REMOVE"
     E   "Edit selected tags with \$EDITOR -- ACTION_EDIT"
     F   "Open directory with file manager in which tagged file resides -- ACTION_FILEMANAGER"
@@ -1287,6 +1294,7 @@ __FTAG_KEYBINDINGS=(
     C-g "Encrypt or decrypt a file with gpg. If encryped, decrypted and vice versa -- ACTION_GPG"
     C-o "Open directory in finder -- ACTION_FINDER"
     C-p "Switch to custom path -- ACTION_PATH"
+    C-q "Stack trace output -- ACTION_STACKTRACE"
     C-r "Open directory with rg in an interactive mode -- ACTION_RIPGREP"
     C-s "Switch directories using dirstack -- ACTION_DIRSTACK"
     C-t "Open directory in twf to edit file -- ACTION_TWF_EDIT"
@@ -1315,6 +1323,7 @@ __FTAG_ENVIRONVARS=(
     FTAG_DIR_PREV                                   'Fzf preview for directories (default: exa)'
     FTAG_KEYFILE                                    'File of keybinding configuration (-g|--genconfig will generate an example $XDG_CONFIG_HOME/ftag/config)'
     FTAG_DIR_MAP                                    'File of directory mappings for the %shortening'
+    FTAG_NERDFONT                                   'Set to 1 if your terminal supports Nerd Fonts, 0 otherwise'
     "zstyle ':ftag:' key-file <location>"           'Alternative way to specify configuration (this has higher priority)'
     "zstyle ':ftag:' colors <colors>"               'Specify no more than 3 colors for output'
     "zstyle ':ftag:' fzf-command fzf_command <cmd>" 'Alternate fzf command (e.g., fzf-tmux)'
@@ -1327,6 +1336,7 @@ __FTAG_ENVIRONVARS=(
     "zstyle ':ftag:' copy-cmd <cmd>"                'Alternative way to specify FTAG_COPY (higher priority)'
     "zstyle ':ftag:' pager <cmd>"                   'Alternative way to specify FTAG_PAGER (higher priority)'
     "zstyle ':ftag:' file-manager <fm>"             'Alternative way to specify FTAG_FILEMANAGER (higher priority)'
+    "zstyle ':ftag:' nerd_font <1|0>"               'Alternative way to specify FTAG_NERDFONT (higher priority)'
 )
 
 typeset -gAH FTAG
@@ -1369,6 +1379,11 @@ zmodload -Fa zsh/parameter p:commands p:parameters \
 zmodload -Fa zsh/zle b:vared \
   || { +Ftag::msg "{err}{green}zsh/zle{res} is requred to use this program{res}"; exit 1; }
 
+zmodload -Fa zsh/system p:sysparams \
+  || { +Ftag::msg "{err}{green}zsh/system{res} is requred to use this program{res}"; exit 1; }
+
+zmodload -Fa zsh/sched
+
 zmodload -Fa zsh/langinfo p:langinfo \
   || [[ -n "$LANG" ]] \
   || +Ftag::msg "{warn}{green}zsh/langinfo{res} is recommended to use this program{res}"
@@ -1388,15 +1403,23 @@ avai_opts=( ${${(@s:, :)${(k)__FTAG_OPTS}}//<*>/} )
 zparseopts -D -A opts h -help b -boxes T -lolcat t -toilet g -genconfig \
     l -local z -zoxide j -jump n -nocolor N -nofzf {d,-dump}::=dump {W,-wrapper}:=wrapper \
     {f,-font}::=cfont {p,-path}:=optpath {q,-query}::=query {C,-color}:=ccolor \
-    {c,-config}:=config {w,-wutag}+=wtag {s,-sort}::=sort {v,-verbose}+=verbose
+    {c,-config}:=config {w,-wutag}+=wtag {s,-sort}::=sort {v,-verbose}+=verbose \
+    {x,-xtrace} || { +Ftag::msg "{err}{yell}$argv[@]{res} is an invalid flag"; }
 
-# Catch wrong flags; :* leaves only matching flags
-# [[ -n "$argv[@]" && -z ${avai_opts:*argv} ]] && {
-#   +Ftag::msg "{err}{yell}$argv[@]{res} is an invalid flag"
-#   builtin print
-#   Ftag::usage -h
-#   exit 1
+# trap 'argv_cleanup "$@"; return 0' EXIT INT
+#
+# function argv_cleanup() { rm -f "${TMPDIR:-/tmp}/argv.${prog}"; trap - SIGINT SIGEXIT; }
+# # Catch wrong flags; :* leaves only matching flags
+# # Have to write to file for next loop
+# [[ ! -f ${TMPDIR:-/tmp}/argv.ftag ]] && {
+#   [[ -n "$argv[@]" && -z ${avai_opts:*argv} ]] && {
+#     +Ftag::msg "{err}{yell}$argv[@]{res} is an invalid flag"
+#     builtin print
+#     Ftag::usage -h
+#     exit 1
+#   }
 # }
+# echo "1" > ${TMPDIR:-/tmp}/argv.${prog}
 
 # OS::notify "x $argv[@]"
 
@@ -1405,9 +1428,11 @@ Ftag::opts "h help" && {
   exit 0
 }
 
+Ftag::opts "x xtrace" && setopt xtrace
+
 local figlet
 Ftag::dep -e "tag"
-Ftag::dep -e "yq"
+# CONF: Ftag::dep -e "yq"
 Ftag::dep "figlet" && figlet="figlet" || figlet="cat"
 
 # Has to be global when program is sourced on second loop
@@ -1448,12 +1473,12 @@ export LESS="-r $LESS"
 # Add path before starting to check dependencies
 (( ! ${path[(I)/usr/local/bin]} )) && {
   path+=( "/usr/local/bin" )
-  trap 'path=( "${path[@]:#/usr/local/bin}" )' INT EXIT
+  trap 'path=( "${path[@]:#/usr/local/bin}" )' EXIT
 }
 
 [[ -n $ZPFX && ${path[(I)$ZPFX/bin]} -eq 0 ]] && {
   path+=( "$ZPFX/bin" )
-  trap 'path=( "${path[@]:#$ZPFX/bin}" )' INT EXIT
+  trap 'path=( "${path[@]:#$ZPFX/bin}" )' EXIT
 }
 # ]]] == END: Setting Variables
 
@@ -1538,9 +1563,7 @@ export LESS="-r $LESS"
   Ftag::zstyle -s pager            ${ph::=__ftag[pager]}    || : ${__ftag[pager]::=${FTAG_PAGER:-${${${commands[bat]}:+bat --paging=always -f}:-less}}}
   Ftag::zstyle -s file-manager     ${ph::=__ftag[fmngr]}    || : ${__ftag[fmngr]::=${FTAG_FILEMANAGER:-${commands[lf]:-${commands[ranger]}:-${commands[xplr]}}}}
   Ftag::zstyle -s key-file         ${ph::=__ftag[keyfile]}  || : ${__ftag[keyfile]::=${FTAG_KEYFILE:-${prog_dir}/ftag}}
-  # Ftag::zstyle -s key-file         ${ph::=__ftag[keyfile]}  || : ${__ftag[keyfile]::=${FTAG_KEYFILE:-${keyfile}}}
-
-  Ftag::font
+  # CONF: Ftag::zstyle -s key-file         ${ph::=__ftag[keyfile]}  || : ${__ftag[keyfile]::=${FTAG_KEYFILE:-${keyfile}}}
 
   # CLI specification trumps zstyle
   [[ -n "$conf" ]] && __ftag[keyfile]="$conf"
@@ -1565,6 +1588,7 @@ export LESS="-r $LESS"
   : ${FTAG_ACTIONS[ACTION_COPY]:=execute-silent(env FZFTAG_ACTION=copy "$prog" \{+f\})}
   : ${FTAG_ACTIONS[ACTION_DELETE]:=execute(env FZFTAG_ACTION=delete "$prog" \{+f\} "${(z)TTY_REDIRECTION}")"${(z)FTAG_PRINT}"}
   : ${FTAG_ACTIONS[ACTION_FILEMANAGER]:=execute(env FZFTAG_ACTION=file-manager "$prog" \{+f\} "${(z)TTY_REDIRECTION}")"${(z)FTAG_PRINT}"}
+  : ${FTAG_ACTIONS[ACTION_CD]:=execute(env FZFTAG_CD=1 "$prog" \{+f\} "${(z)TTY_REDIRECTION}")+abort}
 
   : ${FTAG_ACTIONS[ACTION_GIT]:=execute(env FZFTAG_ACTION=git "$prog" \{+f\} "${(z)TTY_REDIRECTION}")"${(z)FTAG_PRINT}"}
   : ${FTAG_ACTIONS[ACTION_GPG_EDIT]:=execute(env FZFTAG_ACTION=gpg-edit "$prog" \{+f\} "${(z)TTY_REDIRECTION}")"${(z)FTAG_PRINT}"}
@@ -1609,6 +1633,7 @@ export LESS="-r $LESS"
   : ${FTAG_KEYBINDINGS[${__ftag[fzf_alt]}-t]:=$FTAG_ACTIONS[ACTION_VITAG]}
 
   : ${FTAG_KEYBINDINGS[F]:=$FTAG_ACTIONS[ACTION_FILEMANAGER]}
+  : ${FTAG_KEYBINDINGS[C]:=$FTAG_ACTIONS[ACTION_CD]}
   : ${FTAG_KEYBINDINGS[I]:=$FTAG_ACTIONS[ACTION_GIT]}
   : ${FTAG_KEYBINDINGS[${__ftag[fzf_mod]}-s]:=$FTAG_ACTIONS[ACTION_DIRSTACK]}
   : ${FTAG_KEYBINDINGS[${__ftag[fzf_mod]}-b]:=$FTAG_ACTIONS[ACTION_DOTBARE]}
@@ -1688,6 +1713,9 @@ export LESS="-r $LESS"
       }
     done
   }
+
+  # Run font after reading config in case config is wrong and it can be picked up automatically
+  builtin eval "Ftag::font"
 
   [[ -n "$__ftag[kcolors]" ]] && __ftag[colors]=$__ftag[kcolors]
 
@@ -1800,6 +1828,7 @@ export LESS="-r $LESS"
 [keybindings]
 ?   = ACTION_HELP
 A   = ACTION_ADD
+C   = ACTION_CD
 D   = ACTION_REMOVE
 E   = ACTION_EDIT
 F   = ACTION_FILEMANAGER
@@ -1822,6 +1851,7 @@ C-f = ACTION_FORGIT
 C-g = ACTION_GPG
 C-o = ACTION_FINDER
 C-p = ACTION_PATH
+C-q = ACTION_STACKTRACE
 C-r = ACTION_RIPGREP
 C-s = ACTION_DIRSTACK
 C-t = ACTION_TWF_EDIT
@@ -1934,6 +1964,7 @@ if [[ -n "$FZFTAG_ACTION" ]]; then
       # done
       ;;
     (set)
+      # TODO: use langinfo etc for arrows below
       local fname fdir tag file
       Ftag::parse_format "set tags"
       vared -cp "${FTAG[byell]}[]${FTAG[res]} ${FTAG[und]}Set tags for${FTAG[res]}:${nl}$(Ftag::vared::formatter ${pathf[@]})${nl}${nl} " tag
@@ -2037,7 +2068,13 @@ if [[ -n "$FZFTAG_ACTION" ]]; then
     (file-manager)
       (( $#pathf > 1 )) && {
         OS::notify "Only one selection is permitted with file-manager"; return 1
-      } || $FTAG_FILEMANAGER "${reply:h}"
+      } || {
+        if [[ -d "$reply" ]]; then
+          $__ftag[fmngr] "$reply"
+        else
+          $__ftag[fmngr] "${reply:h}"
+        fi
+      }
       ;;
     (git)
       (( $#pathf > 1 )) && {
@@ -2174,10 +2211,10 @@ if [[ -n "$FZFTAG_ACTION" ]]; then
         [[ "$yesno" == (#i)y(es|) ]] && {
           for f ($array) {
             case 1 in
-              (${+commands[dump]}) dump "${f}" && OS::notify "dump: ${f:t} deleted"; ret=$? ;;
-              (${+commands[trash-put]}) trash-put "${f}" && OS::notify "put: ${f:t} deleted"; ret=$? ;;
               (${+commands[rip]}) rip "${f}" && OS::notify "rip: ${f:t} deleted"; ret=$? ;;
+              (${+commands[trash-put]}) trash-put "${f}" && OS::notify "put: ${f:t} deleted"; ret=$? ;;
               (${+commands[gomi]}) gomi "${f}" && OS::notify "gomi: ${f:t} deleted"; ret=$? ;;
+              (${+commands[dump]}) dump "${f}" && OS::notify "dump: ${f:t} deleted"; ret=$? ;;
               (${+commands[osascript]})
                     osascript -e 'tell application "Finder" to delete every item of {''(POSIX file "'${^f:A}'")''}' \
                       >/dev/null
@@ -2212,7 +2249,10 @@ if [[ -n "$FZFTAG_ACTION" ]]; then
       }
       ;;
     (copy-file)
-      Ftag::copy::file "$reply"
+      # TODO: add multiple files
+      (( $#pathf > 1 )) && {
+        OS::notify "Only one selection is permitted with copy-file"; return 1
+      } || Ftag::copy::file "$reply"
       ;;
     (stacktrace)
       Ftag::trace
@@ -2225,6 +2265,33 @@ if [[ -n "$FZFTAG_ACTION" ]]; then
   read -qs
   exit $?
 fi
+
+# FIX: can't get it in main process
+  autoload add-zsh-hook
+  add-zsh-hook -- precmd @Ftag::sched
+
+[[ -n $FZFTAG_CD ]] && {
+  typeset -ga pathf
+  pathf=( ${(@)${${(f)"$(<$@)"}/(#m)*/${${(ws: :)MATCH}[1]}}} )
+  Ftag::map-back "${pathf}"
+
+  (( $#pathf > 1 )) && {
+    OS::notify "Only one selection is permitted with cd"; return 1
+  } || {
+    if [[ -d "${reply:A}" ]]; then
+      OS::notify "$$"
+      @Ftag::sched 'builtin cd "${reply:A}"'
+      return $?
+    else
+      OS::notify "SUB: dol: $$ -- pid: $sysparams[pid] -- ppid: $sysparams[ppid] -- proc: $sysparams[procsubstpid]"
+      # @Ftag::sched 'builtin cd "${reply:A:h}"'
+      # @Ftag::sched "cd ~; $SHELL"
+      print $zsh_scheduled_events
+      return $?
+    fi
+  }
+}
+
 # ]]] == END: Actions
 
 # SECTION: == State Change == [[[
@@ -2388,6 +2455,7 @@ while (( $? != 130 )) {
     return ret
   }
 
+  # OS::notify "dol: $$ -- pid: $sysparams[pid] -- ppid: $sysparams[ppid] -- proc: $sysparams[procsubstpid]"
   Ftag::tag "${(z)tag_arguments}" \
     | $__ftag[fzf_command] \
       ${${(z)${(j. .)FZFTAG_OPTS}}//\'} \
