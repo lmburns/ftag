@@ -1,5 +1,8 @@
 ## FTAG - FZF Tagging TUI
 
+### Preview
+![ftag preview](https://lmburns.com/gallery/media/large/ftag.png)
+
 ### Usage
 
 Parameters requiring arguments can be used with an equals sign (e.g., `--path=`).
