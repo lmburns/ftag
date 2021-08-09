@@ -100,14 +100,14 @@ The copy command that is used to copy the path of the file to the clipboard. Sin
 zstyle ":ftag:" copy-cmd <cmd>
 ```
 
-### `FTAG_FILEMANAGER`
+#### `FTAG_FILEMANAGER`
 The file-manager to open the directory where the file resides using `F` within `fzf`. The defaults are set to `lf`, falling back to `ranger`, falling back to `xplr`. There are plans to add all the file managers so it will choose the first one it comes across.
 
 ```sh
 zstyle ":ftag:" file-manager <cmd>
 ```
 
-### `FTAG_COLORS`
+#### `FTAG_COLORS`
 A list of no more than 3 colors to be used in coloring `ftag`'s output. The first color specifies the tags, the second specifies the tag  separator, and the third specifies the color of the shortened `%DIR_MAP` array.
 
 ```sh
